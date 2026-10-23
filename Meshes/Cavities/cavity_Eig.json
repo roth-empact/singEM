@@ -1,0 +1,21 @@
+{
+  "probP": {
+    "type": "Eig",
+    "numEig": 5,
+    "geomFile": "./Meshes/Cavities/recCavity.json",
+    "meshFile": "./Meshes/Cavities/recCavity.msh",
+    "bOrder": 1
+  },
+  "solveP": {
+    "pkg": "SciPy",
+    "shift": 20e9,
+    "tol": 1e-06
+  },
+  "outP": {
+    "resFile": "./Results/recCavity_p=1.npz",
+    "saveFields": true,
+    "fieldType": "E",
+    "fFile": "fields.npy"
+  },
+  "numProcs": 1
+}

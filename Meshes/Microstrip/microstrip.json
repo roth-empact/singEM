@@ -1,0 +1,64 @@
+{
+  "scale": 1,
+  "volP": {
+    "num": 2,
+    "vol0": {
+      "epr": 7.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    },
+    "vol1": {
+      "epr": 1.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 5,
+    "surf0": {
+      "type": "Outer"
+    },
+    "surf1": {
+      "type": "PEC"
+    },
+    "surf2": {
+      "type": "PEC"
+    },
+    "surf3": {
+      "type": "Port",
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.001,
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 1.0
+    },
+    "surf4": {
+      "type": "Port",
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.001,
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 0.0
+    }
+  }
+}

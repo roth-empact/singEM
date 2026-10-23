@@ -1,0 +1,22 @@
+{
+  "probP": {
+    "type": "Eig",
+    "numEig": 5,
+    "geomFile": "./Meshes/Cavities/ridgedCavity.json",
+    "meshFile": "./Meshes/Cavities/ridgedCavity.e",
+    "bOrder": 2,
+    "sOrder": 1
+  },
+  "solveP": {
+    "pkg": "SciPy",
+    "shift": 20e9,
+    "tol": 1e-06
+  },
+  "outP": {
+    "resFile": "./Results/ridgedCavity_p=1,s=1.npz",
+    "saveFields": true,
+    "fieldType": "E",
+    "fFile": "fields.npy"
+  },
+  "numProcs": 1
+}

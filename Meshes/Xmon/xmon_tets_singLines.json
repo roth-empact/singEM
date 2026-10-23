@@ -1,0 +1,50 @@
+{
+  "scale": 0.001,
+  "volP": {
+    "num": 2,
+    "vol0": {
+      "epr": 11.45,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    },
+    "vol1": {
+      "epr": 1.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 3,
+    "surf0": {
+      "type": "Outer"
+    },
+    "surf1": {
+      "type": "PEC"
+    },
+    "surf2": {
+      "type": "Port",
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.002,
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 1.0
+    }
+  },
+  "lineP": {
+    "num": 1,
+    "line0": {
+      "type": "singLine"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "probP": {
+    "type": "FD",
+    "minFreq": 1e9,
+    "maxFreq": 10e9,
+    "numSteps": 1001,
+    "stepType": "linear",
+    "geomFile": "./Meshes/Microstrip/microstrip.json",
+    "meshFile": "./Meshes/Microstrip/microstrip.msh",
+    "outBC": "PEC",
+    "bOrder": 2,
+    "portMatrix": false
+  },
+  "solveP": {
+    "pkg": "PETSc"
+  },
+  "outP": {
+    "saveV": true,
+    "saveS": true,
+    "resFile": "./Results/microstrip.npz"
+  }
+}

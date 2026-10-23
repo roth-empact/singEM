@@ -1,0 +1,25 @@
+{
+  "probP": {
+    "type": "FD",
+    "maxAMR": 1,
+    "minFreq": 5e9,
+    "maxFreq": 5e9,
+    "freqStep": 100000000.0,
+    "geomFile": "./Meshes/Xmon/xmon_tets.json",
+    "meshFile": "./Meshes/Xmon/xmon_tets.inp",
+    "bOrder": 1,
+    "sOrder": 1
+  },
+  "solveP": {
+    "pkg": "PETSc"
+  },
+  "outP": {
+    "saveV": true,
+    "saveS": false,
+    "resFile": "soloXmon_tets_E_1st.npz",
+    "saveFields": false,
+    "fieldType": "E",
+    "fFile": "fields.npy",
+    "fieldPoints": "./Meshes/Prisms/Xmon/EvalPts/xmonEvalPoints_thickMetal_xCurve.npy"
+  }
+}

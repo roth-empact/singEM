@@ -1,0 +1,25 @@
+{
+  "scale": 1,
+  "volP": {
+    "num": 1,
+    "vol0": {
+      "epr": 1.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 1,
+    "surf0": {
+      "type": "Outer"
+    }
+  },
+  "lineP": {
+    "num": 1,
+    "line0": {
+      "type": "singLine",
+      "coeff": 0.667
+    }
+  }
+}

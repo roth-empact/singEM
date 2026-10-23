@@ -1,0 +1,25 @@
+{
+  "probP": {
+    "type": "FD",
+    "minFreq": 5000000000.0,
+    "maxFreq": 5000000000.0,
+    "freqStep": 100000000.0,
+    "geomFile": "./Meshes/surfPart/qubitSurfPart.json",
+    "meshFile": "./Meshes/surfPart/qubitSurfPart_10umTrench.inp",
+    "bOrder": 1,
+    "sOrder": 1
+  },
+  "solveP": {
+    "pkg": "PETSc"
+  },
+  "outP": {
+    "saveV": true,
+    "saveS": false,
+    "resFile": "./Results/surfPart/qubitSurfPart.npz",
+    "saveFields": false,
+    "fieldType": "E",
+    "fFile": "fields.npy",
+    "fieldPoints": "./Meshes/surfPart/EvalPts/qubitSurfPartEvalPoints_topCorner.npy"
+  },
+  "numProcs": 20
+}
