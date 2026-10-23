@@ -58,18 +58,7 @@ def main(simFile, verbose):
     print(f"Solving {probStr} problem on {meshFile} using {methodStr} with {numProcs} processors.")
 
   # Prepare filenames for AMR (if used)
-  if probP["maxAMR"] != 1:
-    cubFile_base = probP["cubFile"][:probP["cubFile"].find(".",1)]
-    meshFile_base = probP["meshFile"][:probP["meshFile"].find(".",1)]
-    meshFile_end = probP["meshFile"][probP["meshFile"].find(".",1):]
-    resFile = outP["resFile"]
-    if resFile != None:
-      resFileEnd = resFile.find(".",1)
-      curResFile = f"{resFile[:resFileEnd]}_0{resFile[resFileEnd:]}"
-    else:
-      curResFile = None
-  else:
-    curResFile = outP["resFile"]
+  curResFile = outP["resFile"]
         
   for passNum in range(probP["maxAMR"]):
     pass_start = time.time()
@@ -92,6 +81,12 @@ def main(simFile, verbose):
       print(f"Shortest triangular edge: {(l_min*1e3):.3e} mm")
       print(f"Average triangular edge length: {(l_avg*1e3):.3e} mm")
       print(f"Triangular edge length standard deviation: {(l_stdev*1e3):.3e} mm")
+
+    # Mark whether singular functions are being used in the solver parameters (for determining LU memory constraints)
+    if len(singEleLists["singTets"]) != 0 or len(singEleLists["singWedges"]) != 0:
+      solveP["singFlag"] = True
+    else:
+      solveP["singFlag"] = False
 
     ## Form matrices and driving vectors
     start_time = time.time()
@@ -121,7 +116,7 @@ def main(simFile, verbose):
               
               # Update the source vector and solve the problem
               matStruct = modify_f_vector(matStruct, port_idx, basisMaps)
-              x, _ = solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs)
+              x, _ = solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs, outP["resFile"])
               portV = post.getPortVoltages(x, basisMaps["portVoltVecInds"], basisMaps["portVoltVecVals"], \
                                            basisMaps["portVoltScalInds"], basisMaps["portVoltScalVals"], \
                                            matStruct["K1"].shape[0], connLists["portP"], simType, "FD", freqs=freqs)
@@ -172,7 +167,7 @@ def main(simFile, verbose):
             
         else:
           # Normal mode: single excitation
-          x, diagnostics = solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs)
+          x, diagnostics = solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs, outP["resFile"])
           resDict["diagnostics"] = diagnostics
           
           if verbose:

@@ -8,7 +8,24 @@ from itertools import repeat
 from linalg_funcs import itSolve_par, saveCSRData
 import subprocess, os
 
-def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
+def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs, res_file_name):
+  """
+  Evaluates a frequency domain problem given the finite element matrices and driving vector
+
+  Inputs:
+    matStruct     - Dictionary containing the matrices and driving vector
+    subDLists     - Dictionary containing information about the subdomains
+    freqs         - Vector of frequencies to solve the problem at
+    solveP        - Dictionary containing parameters of the solver
+    simType       - Type of simulation being run ("E", "A", or "TCS")
+    numProcs      - Number of processors available to parallelize over
+    res_file_name - File path used to write PETSc results (if needed)
+  
+  Outputs:
+    totVals       - Total solution vector at each frequency (stored as an array)
+    diagnostics   - Dictionary containing diagnostic information
+
+  """
   # Set constants
   ep0 = 1e-9 / (36 * np.pi)
   mu0 = 4e-7 * np.pi
@@ -30,6 +47,7 @@ def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
   
   totFreqs = np.copy(freqs)
   numTotFreqs = np.size(totFreqs)
+  #print(f"numTotFreqs is equal to {numTotFreqs }")
   unsolvedFreqs = np.ones((numTotFreqs,), dtype=bool) # Frequency indices where the solution hasn't been found
   totVals = np.zeros((numUnknowns, numTotFreqs), dtype=np.complex128)
 
@@ -40,7 +58,7 @@ def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
   else:
     curFreqInds = np.arange(numTotFreqs)
   numCurFreqs = len(freqs) # Number of frequencies for the current SSP iteration
-
+  
   while numCurFreqs > 0: # Loop through SSP passes
     if solveP["pkg"].lower() == "scipy":
       ## Set up composite matrices for either field-based or potential-based methods
@@ -71,7 +89,7 @@ def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
         for ii in range(numCurFreqs):
           curVals[:,ii], diagnostics["iter"][curFreqInds[ii]] = itSolve_par(A[ii], b[ii], freqs[ii], solveP, M=M, debug=True)
     elif solveP["pkg"].lower() == "petsc":
-      curVals, curRes = solveFD_PETSc(matStruct, freqs, solveP, simType, subDLists, numProcs)
+      curVals, curRes = solveFD_PETSc(matStruct, freqs, solveP, simType, subDLists, numProcs, res_file_name)
       if "ksp" in solveP and (solveP["ksp"].lower() != "lu" and solveP["pc"].lower() != "lu"):
         # If the solver isn't direct, save convergence info
         for jj, freqInd in enumerate(curFreqInds):
@@ -92,7 +110,7 @@ def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
           totVals[:,ind][numEdgeUnknowns:] = totVals[:,ind][numEdgeUnknowns:]*Ken_coeff
 
     ## Use SSP to interpolate solutions at other frequecies
-    x_SSP, converged_SSP = ssp_refine(totFreqs[unsolvedFreqs], matStruct, curVals[:,validSols], simType)
+    x_SSP, converged_SSP = ssp_refine(totFreqs[unsolvedFreqs], matStruct, curVals[:,validSols], simType,1e-1)
     
     ## Store the valid SSP solutions
     sspInds = np.arange(numTotFreqs)[unsolvedFreqs]
@@ -118,25 +136,42 @@ def solveFD(matStruct, subDLists, freqs, solveP, simType, numProcs):
     
   return totVals, diagnostics
 
-def solveFD_PETSc(matStruct, freqs, solveP, simType, subDLists, numProcs):
+def solveFD_PETSc(matStruct, freqs, solveP, simType, subDLists, numProcs, res_file_name):
+  """
+  Sets up a PETSc subprocess to solve a frequency domain problem at the provided set of frequencies
+
+  Inputs:
+    matStruct     - Dictionary containing the matrices and driving vector
+    freqs         - Vector of frequencies to solve the problem at
+    solveP        - Dictionary containing parameters of the solver
+    simType       - Type of simulation being run ("E", "A", or "TCS")
+    subDLists     - Dictionary containing information about the subdomains
+    numProcs      - Number of processors available to parallelize over
+    res_file_name - File path used to write PETSc results
+  
+  Outputs:
+    x    - Total solution vector at each frequency (stored as an array)
+    res  - Residual vector for each solve
+  """
   if "vecSubCutoffs" in subDLists:
     vecSubCutoffs, vecSubDs = subDLists["vecSubCutoffs"], subDLists["vecSubDs"]
     scalSubCutoffs, scalSubDs = subDLists["scalSubCutoffs"], subDLists["scalSubDs"]
   else:
     vecSubCutoffs, vecSubDs, scalSubCutoffs, scalSubDs = [[], [], [], []]
-
-  csrFile = "csrData.npz"
-  outFile = "PETSc_result.npy"
-  resFile = "PETSc_residual.npy"
+    
+  basePath = "./"+os.path.splitext(os.path.basename(res_file_name))[0]
+  csrFile = basePath+"csrData.npz"
+  outFile = basePath+"PETSc_result.npy"
+  resFile = basePath+"PETSc_residual.npy"
   saveCSRData(matStruct, freqs, numProcs, csrFile, vecSubCutoffs, vecSubDs, scalSubCutoffs, scalSubDs)
         
-  cmd = buildPETScCmd("PETSc_solve.py", solveP, matStruct, csrFile, simType, vecSubCutoffs, numProcs, debugFlag=False)
-  print(cmd)
+  cmd = buildPETScCmd("PETSc_solve.py", solveP, matStruct, csrFile, outFile, resFile, simType, vecSubCutoffs, numProcs, debugFlag=False)
+  # print(cmd)
   
   # Solve the problem in PETSc
   result = subprocess.run(cmd, capture_output=True, text=True)
-  print(result.stdout)
-  print(result.stderr)
+  # print(result.stdout)
+  # print(result.stderr)
 
   # Load solution and residual from files, delete files and return
   x = np.load(outFile)
@@ -147,113 +182,48 @@ def solveFD_PETSc(matStruct, freqs, solveP, simType, subDLists, numProcs):
 
   return x, res
 
-def buildPETScCmd(simFile, solveP, matStruct, csrFile, simType, vecSubCutoffs, numProcs, debugFlag=False):
-  # Basic PETSc setup
+def buildPETScCmd(simFile, solveP, matStruct, csrFile, outFile, resFile, \
+                  simType, vecSubCutoffs, numProcs, debugFlag=False):
+  """
+  Constructs a command string to run a PETSc solve of the matrix
+
+  Inputs:
+    simFile       - Path to the file used to run the PETSc solution process
+    solveP        - Dictionary containing parameters of the solver
+    matStruct     - Dictionary containing the matrices and driving vector
+    csrFile       - Path to the file containing all of the matrices in parallelized form
+    outFile       - Path to the PETSc output file
+    resFile       - Path to the PETSc residual file    
+    simType       - Type of simulation being run ("E", "A", or "TCS")
+    vecSubCutoffs - Vector of subdomain cutoffs (only needed for domain decomposition)
+    numProcs      - Number of processors available to parallelize over
+    debugFlag     - Indicates whether to print out additional debug information
+
+  Outputs:
+    cmd           - String providing the command used to run the PETSc solve process
+  """
   nv = matStruct["K1"].shape[0] # Number of vector unknowns
   if "valgrind" in solveP and solveP["valgrind"]:
     cmd = ["valgrind", "--tool=memcheck", "--leak-check=full"]
   else:
     cmd = []
-  cmd.extend(["mpiexec", "-n", f"{numProcs}", "python", f"{simFile}", "-nv", f"{nv}", "-f", csrFile, '-simType', simType, '-nsub', f"{len(vecSubCutoffs)}", '-log_view'])
+  cmd.extend(["mpiexec", "-n", f"{numProcs}", "python", f"{simFile}", "-nv", f"{nv}", "-f", csrFile, \
+              '-simType', simType, '-nsub', f"{len(vecSubCutoffs)}", "-outFileZ", outFile, "-resFileZ", resFile, '-log_view'])
   
   if debugFlag:
     cmd.extend(['-memory_view', '-mem_debug', '-ksp_view'])
-  # cmd.extend(['-memory_view', '-ksp_view'])
   if simType == "A":
     ns = matStruct["Gnn"].shape[0] # Number of scalar unknowns
     cmd.extend(["-ns", f"{ns}"])
 
-  # Solver setup
-  if solveP["ksp"].lower() == "lu" or solveP["pc"].lower() == "lu": # Special setup is needed for the direct solver
-    # cmd.extend(["-ksp_type", "preonly", "-pc_type", "lu", "-pc_factor_mat_ordering_type", "nd", \
-    #             "-pc_factor_mat_solver_type", "mumps", "-mat_mumps_icntl_4", "1"]) # Sequential nested dissection
-    if "lu-pkg" in solveP and solveP["lu-pkg"].lower() == "PETSc":
-      cmd.extend(["-ksp_type", "preonly", "-pc_type", "lu", "-pc_factor_mat_ordering_type", "nd", \
-                  "-pc_factor_shift_type", "nonzero"]) # Parallel ordering via ParMETIS
-    else:
-      cmd.extend(["-ksp_type", "preonly", "-pc_type", "lu", "-pc_factor_mat_solver_type", "mumps", \
-                  "-mat_mumps_icntl_4", "1", "-mat_mumps_icntl_28", "2", "-mat_mumps_icntl_29", "2", \
-                  "-mat_mumps_cntl_1", "0.1"]) # Parallel ordering via ParMETIS
-      cmd.extend(["-mat_mumps_icntl_14", "500"])
+  # Set direct solver settings
+  cmd.extend(["-ksp_type", "preonly", "-pc_type", "lu", "-pc_factor_mat_solver_type", "mumps", \
+              "-mat_mumps_icntl_4", "1", "-mat_mumps_icntl_28", "2", "-mat_mumps_icntl_29", "2", \
+              "-mat_mumps_cntl_1", "0.1"]) # Parallel ordering via ParMETIS
+  if solveP["singFlag"]:
+    # If singular functions are used, increase the memory allocation for the factorization
+    cmd.extend(["-mat_mumps_icntl_14", "500"])
 
-  else:
-    maxit, tol = solveP["maxit"], solveP["tol"]
-
-    # Solver setup
-    cmd.extend(["-ksp_type", solveP["ksp"].lower(), "-ksp_rtol", f"{tol}", "-ksp_max_it", f"{maxit}"])
-    # cmd.extend(["-ksp_view", "-ksp_error_if_not_converged"])
-    if solveP["ksp"].lower() == "gmres": # For GMRES, set restart tolerance and ensure breakdown tolerance isn't too low
-      restart = solveP["restart"] 
-      cmd.extend(["-ksp_gmres_restart", f"{restart}", "-ksp_gmres_breakdown_tolerance", f"{1.0e2}"]) 
-    elif solveP["ksp"].lower() == "minres": # For MINRES, adjust settings to avoid termination due to large guess norms
-      cmd.extend(["-ksp_minres_nutol", f"{1e-50}", "-ksp_minres_radius", f"{1e50}"])
-
-      
-    # Preconditioner setup
-    def setPreconOptions(cmd, pc, subStr): # Unified format for modifying preconditioner options across subsolvers
-      if pc.lower() == "bjacobi" or pc.lower() == "asm" or pc.lower() == "gasm": # Set up subsolvers for block decompositions
-
-        cmd.extend([f"-{subStr}sub_ksp_type", "preonly", f"-{subStr}sub_pc_type", "lu", \
-                    f"-{subStr}sub_pc_factor_mat_solver_type", "mumps", f"-{subStr}sub_mat_mumps_icntl_4", "1",
-                    f"-{subStr}sub_mat_mumps_icntl_28", "2", f"-{subStr}sub_mat_mumps_icntl_29", "2", \
-                    f"-{subStr}sub_mat_mumps_cntl_1", "0.1"]) # Parallel ordering via ParMETIS
-        if simType == "A":
-          cmd.extend([f"-{subStr}sub_mat_mumps_icntl_14", "200"])
-        if debugFlag:
-          cmd.extend([f"-{subStr}sub_ksp_view"])
-
-        # if simType == "E":
-        #   cmd.extend([f"-{subStr}sub_ksp_type", "preonly", f"-{subStr}sub_pc_type", "lu", \
-        #               f"-{subStr}sub_pc_factor_mat_solver_type", "mumps", f"-{subStr}sub_mat_mumps_icntl_4", "1",
-        #               f"-{subStr}sub_mat_mumps_icntl_28", "2", f"-{subStr}sub_mat_mumps_icntl_29", "2", \
-        #               f"-{subStr}sub_mat_mumps_cntl_1", "0.1"]) # Parallel ordering via ParMETIS
-        # elif simType == "A":
-        #   cmd.extend([f"-{subStr}sub_ksp_type", "preonly", f"-{subStr}sub_pc_type", "lu", \
-        #             f"-{subStr}sub_pc_factor_mat_ordering_type", "nd", f"-{subStr}sub_pc_factor_shift_type", "nonzero"])
-        # if debugFlag:
-        #   cmd.extend([f"-{subStr}sub_ksp_view"])
-          
-        cmd.extend([f"-{subStr}sub_ksp_error_if_not_converged"])
-        if pc.lower() == "bjacobi":
-          cmd.extend([f"-{subStr}pc_bjacobi_local_blocks", f"{1}"])
-        elif pc.lower() == "asm":
-          cmd.extend([f"-{subStr}pc_asm_type", "restrict", f"-{subStr}pc_asm_local_type", "additive"])
-        elif pc.lower() == "gasm":
-          cmd.extend([f"-{subStr}pc_gasm_type", "restrict", f"-{subStr}pc_gasm_view_subdomains"])
-      
-      elif pc.lower() == "lu-blr": # Block low-rank LU decomposition - Doesn't work very well
-        eps = 1e-6 #solveP["BLR_tol"]
-        cmd.extend([f"{subStr}pc_factor_mat_solver_type", "mumps", f"-{subStr}mat_mumps_icntl_4", "3", \
-                    f"-{subStr}mat_mumps_icntl_28", "2", f"-{subStr}mat_mumps_icntl_29", "2", \
-                    f"-{subStr}mat_mumps_icntl_35", "2", f"-{subStr}mat_mumps_cntl_7", f"{eps}", \
-                    f"-{subStr}mat_mumps_icntl_36", "1"])
-        
-      # elif pc.lower() == "ilu": # This doesn't work because ILU isn't supported in SUPERLU_DIST, only in sequential SUPERLU
-      #   cmd.extend([f"-{subStr}pc_factor_mat_solver_type", "superlu_dist", \
-      #               f"-{subStr}mat_superlu_ilu_droptol", f"1e-8", \
-      #               f"-{subStr}mat_superlu_ilu_fillfactor", f"600"])
-
-      return cmd
-
-    if solveP["pc"].lower() != "lu-blr":
-      cmd.extend(["-pc_type", solveP["pc"].lower()])
-    else:
-      cmd.extend(["-pc_type", "lu"])
-    cmd = setPreconOptions(cmd, solveP["pc"], "")
-    # if simType == "E":
-    #   cmd.extend(["-pc_type", solveP["pc"].lower()])
-    #   cmd = setPreconOptions(cmd, solveP["pc"], "")
-    # elif simType == "A":
-    #   cmd.extend(["-pc_type", "fieldsplit", "-pc_fieldsplit_type", "schur", "-pc_fieldsplit_schur_fact_type", "full", "-pc_fieldsplit_schur_precondition", "a11"])
-    #   cmd.extend(["-pc_type", "fieldsplit", "-pc_fieldsplit_type", "multiplicative"])
-    #   for ii in range(2): # Set up subsolver info for field split
-    #     if ii == 0: # Scalar potential
-    #       cmd.extend([f"-fieldsplit_{ii}_ksp_type", "preonly", f"-fieldsplit_{ii}_pc_type", solveP["pc"].lower()])
-    #       cmd = setPreconOptions(cmd, solveP["pc"], f"fieldsplit_{ii}_")
-    #     elif ii == 1: # Vector potential
-    #       cmd.extend([f"-fieldsplit_{ii}_ksp_type", "gmres", f"-fieldsplit_{ii}_ksp_max_it", "10", f"-fieldsplit_{ii}_ksp_gmres_breakdown_tolerance", f"{1.0e2}", f"-fieldsplit_{ii}_pc_type", solveP["pc"].lower()])
-    #       cmd = setPreconOptions(cmd, solveP["pc"], f"fieldsplit_{ii}_")
-    #   cmd.extend([f"-fieldsplit_{ii}_ksp_type", "preonly", f"-fieldsplit_{ii}_pc_type", "lu", f"-fieldsplit_{ii}_pc_factor_mat_ordering_type", "nd"])
 
   return cmd
 
@@ -383,7 +353,7 @@ def ssp_refine(freqs, matStruct, sols, simType, threshold=1e-4):
     # get residual
     res = np.linalg.norm(b - (A @ (x)).T) / np.linalg.norm(b)
     # print(f"Residual at {freqs[ii]/1e9:.3f} GHz: {res:.3e}")
-
+      
     if res <= threshold:
       convergedPoints[ii] = True
 

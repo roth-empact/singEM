@@ -82,207 +82,13 @@ class itSolve_counter(object):
         self.niter += 1
         self.relres = relres
 
-def itSolve_PETSc(A, b, solveP, numProcesses):
-  print("Solving the system with PETSc")
-
-  perm = spa.csgraph.reverse_cuthill_mckee(A, symmetric_mode=True)
-  perm_inv = np.argsort(perm)
-  A = A[perm[:,None], perm]
-  b = b[perm]
-
-  ## Extract the CSR data from the matrix
-  rowptr = A.indptr.astype(np.int32)
-  colval = A.indices.astype(np.int32)
-  data = A.data      
-
-  rowptr_dict = {}
-  colval_dict = {}
-  data_dict = {}
-  b_dict = {}
-  nv_proc = np.zeros((numProcesses,), dtype=np.int32) # Number of nonzero values per processor
-
-  ## First determine how many rows belong to each process
-  rowsPerProc = np.arange(np.floor((len(rowptr)-1) / numProcesses), len(rowptr), np.floor((len(rowptr)-1) / numProcesses), dtype=np.int32) # Entries assigned to each processor
-  spareRows = np.mod(len(rowptr)-1, numProcesses) # Assign extra rows to the first few processes if things don't divide evenly
-  offset = 0
-  while spareRows > 0:
-    rowsPerProc[offset:] += 1
-    offset += 1
-    spareRows -= 1
-  
-  ## Then form an array to split up the data and fill it
-  for proc in range(numProcesses):
-    if proc == 0:
-      rowptr_dict[f"proc{proc}"] = rowptr[:rowsPerProc[proc]+1]
-      b_dict[f"proc{proc}"] = b[:rowsPerProc[proc]]
-    else:
-      rowptr_dict[f"proc{proc}"] = rowptr[rowsPerProc[proc-1]:rowsPerProc[proc]+1]
-      b_dict[f"proc{proc}"] = b[rowsPerProc[proc-1]:rowsPerProc[proc]]
-    # else:
-    #   rowptr_dict[f"proc{proc}"] = np.append(rowptr[rowsPerProc[proc-1]:rowsPerProc[proc]], rowptr[rowsPerProc[proc]-1])
-    #   b_dict[f"proc{proc}"] = b[rowsPerProc[proc-1]:rowsPerProc[proc]]
-    colval_dict[f"proc{proc}"] = colval[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-    data_dict[f"proc{proc}"] = data[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-    nv_proc[proc] = rowptr_dict[f"proc{proc}"][-1]-rowptr_dict[f"proc{proc}"][0]
-
-  ## Write the vector and csr data to a file
-  csrFile = "csrData.npz"
-  np.savez(csrFile, rowptr=rowptr_dict, colval=colval_dict, data=data_dict, b=b_dict, nv_proc=nv_proc)
-
-  ## Solve the system in parallel using PETSc with MPI
-  cmd = ["mpiexec", "-n", f"{numProcesses}", "python", "PETSc_solve.py", "-n", f"{len(rowptr)-1}", "-f", csrFile]
-  
-  # Add in solver settings
-  # cmd.extend(["-ksp_type", "preonly", "-pc_type", 'lu']) # Direct solve
-  restart, maxit, tol = solveP["restart"], solveP["maxit"], solveP["tol"]
-  # cmd.extend(["-ksp_type", "gmres", "-ksp_rtol", f"{tol}", "-ksp_max_it", f"{maxit}", "-ksp_gmres_restart", f"{restart}"]) # GMRES
-  cmd.extend(["-ksp_type", "cg", "-ksp_rtol", f"{tol}", "-ksp_max_it", f"{maxit}"]) # CG
-  cmd.extend(["-ksp_type", "minres", "-ksp_rtol", f"{tol}", "-ksp_max_it", f"{maxit}"]) # MINRES
-
-  # Add in preconditioner settings
-  cmd.extend(["-pc_type", "none"]) # None
-
-  result = subprocess.run(cmd, capture_output=True, text=True)
-  print(result.stdout)
-  print(result.stderr)
-
-  ## Load in the results and eliminate the temp files
-  resFile = "PETSc_result.npy"
-  totVals = np.load(resFile)[perm_inv]
-  os.remove(csrFile)
-  os.remove(resFile)
-
-  return totVals
-
-def eigs_SLEPc(A, B, numProcesses, neig, sigma=0, which="SM"):
-  print("Finding the eigenpairs with SLEPc")
-  ## Extract the CSR data from each matrix
-  for ii, mat in enumerate([A, B]):
-    rowptr = mat.indptr.astype(np.int32)
-    colval = mat.indices.astype(np.int32)
-    data = mat.data      
-
-    rowptr_dict = {}
-    colval_dict = {}
-    data_dict = {}
-    nv_proc = np.zeros((numProcesses,), dtype=np.int32) # Number of nonzero values per processor
-
-    ## First determine how many rows belong to each process
-    rowsPerProc = np.arange(np.floor((len(rowptr)-1) / numProcesses), len(rowptr), np.floor((len(rowptr)-1) / numProcesses), dtype=np.int32) # Entries assigned to each processor
-    spareRows = np.mod(len(rowptr)-1, numProcesses) # Assign extra rows to the first few processes if things don't divide evenly
-    offset = 0
-    while spareRows > 0:
-      rowsPerProc[offset:] += 1
-      offset += 1
-      spareRows -= 1
-  
-    ## Then form an array to split up the data and fill it
-    for proc in range(numProcesses):
-      if proc == 0:
-        rowptr_dict[f"proc{proc}"] = rowptr[:rowsPerProc[proc]+1]
-      else:
-        rowptr_dict[f"proc{proc}"] = rowptr[rowsPerProc[proc-1]:rowsPerProc[proc]+1]
-      colval_dict[f"proc{proc}"] = colval[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-      data_dict[f"proc{proc}"] = data[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-      nv_proc[proc] = rowptr_dict[f"proc{proc}"][-1]-rowptr_dict[f"proc{proc}"][0]
-
-    if ii == 0:
-      A_dict = {'rowptr': rowptr_dict, 'colval': colval_dict, 'data': data_dict, 'nv_proc': nv_proc}
-    elif ii == 1:
-      B_dict = {'rowptr': rowptr_dict, 'colval': colval_dict, 'data': data_dict, 'nv_proc': nv_proc}
-
-  ## Write the vector and csr data to a file
-  csrFile = "csrData.npz"
-  np.savez(csrFile, A=A_dict, B=B_dict)
-
-  ## Solve the system in parallel using SLEPc with MPI
-  cmd = ["mpiexec", "-n", f"{numProcesses}", "python", "SLEPc_solve.py", "-n", f"{len(rowptr)-1}", \
-          "-f", csrFile, "-neig", f"{neig}", "-sigma", f"{sigma}", "-which", which]
-  print(cmd)
-  result = subprocess.run(cmd, capture_output=True, text=True)
-  print(result.stdout)
-  print(result.stderr)
-
-  ## Load in the results and eliminate the temp files
-  resFile = "SLEPc_result.npz"
-  eigpairs = np.load(resFile)
-  eigvals = eigpairs["eigvals"]
-  eigvecs = eigpairs["eigvecs"]
-  os.remove(csrFile)
-  os.remove(resFile)
-
-  return eigvals, eigvecs
-
-def cond_SLEPc(A, numProcesses):
-  print("Finding the condition number with SLEPc")
-  ## Extract the CSR data from each matrix
-  rowptr = A.indptr.astype(np.int32)
-  colval = A.indices.astype(np.int32)
-  data = A.data      
-
-  rowptr_dict = {}
-  colval_dict = {}
-  data_dict = {}
-  nv_proc = np.zeros((numProcesses,), dtype=np.int32) # Number of nonzero values per processor
-
-  ## First determine how many rows belong to each process
-  rowsPerProc = np.arange(np.floor((len(rowptr)-1) / numProcesses), len(rowptr), np.floor((len(rowptr)-1) / numProcesses), dtype=np.int32) # Entries assigned to each processor
-  spareRows = np.mod(len(rowptr)-1, numProcesses) # Assign extra rows to the first few processes if things don't divide evenly
-  offset = 0
-  while spareRows > 0:
-    rowsPerProc[offset:] += 1
-    offset += 1
-    spareRows -= 1
-
-  ## Then form an array to split up the data and fill it
-  for proc in range(numProcesses):
-    if proc == 0:
-      rowptr_dict[f"proc{proc}"] = rowptr[:rowsPerProc[proc]+1]
-    else:
-      rowptr_dict[f"proc{proc}"] = rowptr[rowsPerProc[proc-1]:rowsPerProc[proc]+1]
-    colval_dict[f"proc{proc}"] = colval[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-    data_dict[f"proc{proc}"] = data[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
-    nv_proc[proc] = rowptr_dict[f"proc{proc}"][-1]-rowptr_dict[f"proc{proc}"][0]
-
-  ## Write the vector and csr data to a file
-  csrFile = "csrData.npz"
-  np.savez(csrFile, rowptr=rowptr_dict, colval=colval_dict, data=data_dict, nv_proc=nv_proc)
-
-  # ## Get the smallest and largest singular values
-  # svals = np.zeros((2,), dtype=np.float64)
-  # for ii, which in enumerate(["SM", "LM"]):
-  #   cmd = ["mpiexec", "-n", f"{numProcesses}", "python", "SLEPc_svd.py", "-n", f"{len(rowptr)-1}", \
-  #           "-f", csrFile, "-nsv", f"{10}", "-which", which]
-  #   result = subprocess.run(cmd, capture_output=True, text=True)
-  #   print(result.stdout)
-  #   print(result.stderr)
-
-  #   ## Load in the results and eliminate the temp files
-  #   resFile = "SLEPc_result.npz"
-  #   res = np.load(resFile)
-  #   print(res)
-  #   svals[ii] = res["svals"][0]
-  #   os.remove(resFile)
-  # os.remove(csrFile)
-  # cond = svals[1]/svals[0]
-
-  cmd = ["mpiexec", "-n", f"{numProcesses}", "python", "PETSc_condest.py", "-n", f"{len(rowptr)-1}", \
-            "-f", csrFile]
-  result = subprocess.run(cmd, capture_output=True, text=True)
-  print(result.stdout)
-  print(result.stderr)
-
-  return cond
-
-def saveCSRData(matStruct, freqs, numProcs, csrFile, vecSubCutoffs=[], vecBasisSubDs=[], scalSubCutoffs=[], scalBasisSubDs=[], \
-                Vs=[], portVoltVecInds=[], portVoltVecVals=[], qubitVoltVecInds=[], qubitVoltVecVals=[], \
-                portVoltScalInds=[], portVoltScalVals=[], qubitVoltScalInds=[], qubitVoltScalVals=[], qubitP=[]):
+def saveCSRData(matStruct, freqs, numProcs, csrFile, vecSubCutoffs=[], vecBasisSubDs=[], scalSubCutoffs=[], scalBasisSubDs=[]):
   """
-  Saves data in a format to be used by PETSc
+  Saves matrix data in a format to be used by PETSc in parallel
 
   Inputs:
-    A                 - The matrix for the problem
-    b                 - The driving vector for the problem
+    matStruct         - The matrix for the problem
+    freqs             - Frequencies to solve the problem at
     numProcs          - The number of processors to be used by PETSc
     csrFile           - The filename used to save the data for PETSc
     vecSubCutoffs     - Cutoffs in vector unknown numbering between subdomains. If provided, this information is used
@@ -363,38 +169,9 @@ def saveCSRData(matStruct, freqs, numProcs, csrFile, vecSubCutoffs=[], vecBasisS
         matArr[proc]["totBasisSubDs"][subNum] = np.append(scalTotMap[matArr[proc]["scalBasisSubDs"][subNum]], \
                                                                vecTotMap[matArr[proc]["vecBasisSubDs"][subNum]])
 
-  
-  # if len(freqs) != 0: # FD Simulation
-  #   np.savez(csrFile, *matArr, freqs=freqs, vecLocSizes=np.array(vecRowsPerProc), scalLocSizes=np.array(scalRowsPerProc), procSubDs=procSubDs)
-  # elif len(qubitVoltVecVals) != 0: # Maxwell-Schrodinger simulation
-  #   np.savez(csrFile, *matArr, Vs=Vs, portVoltVecInds=portVoltVecInds, portVoltVecVals=portVoltVecVals, \
-  #            qubitVoltVecInds=qubitVoltVecInds, qubitVoltVecVals=qubitVoltVecVals, qubitP=qubitP, \
-  #            vecLocSizes=np.array(vecRowsPerProc), scalLocSizes=np.array(scalRowsPerProc), procSubDs=procSubDs)
-  # elif len(Vs) != 0: # TD Simulation
-  #   np.savez(csrFile, *matArr, Vs=Vs, portVoltVecInds=portVoltVecInds, portVoltVecVals=portVoltVecVals, \
-  #            vecLocSizes=np.array(vecRowsPerProc), scalLocSizes=np.array(scalRowsPerProc), procSubDs=procSubDs)
-
   resDict = {"vecLocSizes": np.array(vecRowsPerProc), "scalLocSizes": np.array(scalRowsPerProc), "procSubDs": procSubDs}
   if len(freqs) != 0: # FD Simulation
     resDict["freqs"] = freqs
-  elif len(Vs) != 0: # TD simulation
-    resDict["Vs"] = Vs
-    resDict["numPorts"] = len(portVoltVecInds)
-    for ii in range(len(portVoltVecInds)):
-      resDict[f"portVoltVecInds_{ii}"] = vecTotMap[portVoltVecInds[ii]]
-      resDict[f"portVoltVecVals_{ii}"] = portVoltVecVals[ii]
-      if simType == "A":
-        resDict[f"portVoltScalInds_{ii}"] = scalTotMap[portVoltScalInds[ii]]
-        resDict[f"portVoltScalVals_{ii}"] = portVoltScalVals[ii]
-    if len(qubitVoltVecVals) != 0: # Maxwell-Schrodinger simulation
-      resDict["numQubits"] = len(qubitVoltVecInds)
-      for ii in range(len(qubitVoltVecInds)):
-        resDict[f"qubitVoltVecInds_{ii}"] = vecTotMap[qubitVoltVecInds[ii]] 
-        resDict[f"qubitVoltVecVals_{ii}"] = qubitVoltVecVals[ii]
-        if simType == "A":
-          resDict[f"qubitVoltScalInds_{ii}"] = scalTotMap[qubitVoltScalInds[ii]]
-          resDict[f"qubitVoltScalVals_{ii}"] = qubitVoltScalVals[ii]
-      resDict["qubitP"] = qubitP
 
   if numSubDs != 0:
     # Create a list of all unknowns belonging to each subdomain
@@ -415,6 +192,16 @@ def matSciPyToPETSc(A, matArr, key, numProcs, procStartInds):
   """
   Converts the format of a SciPy matrix to a set of dictionaries 
   that can be imported into PETSc 
+
+  Inputs:
+    A             - Matrix to convert
+    matArr        - List containing the prior converted matrices
+    key           - String describing the current matrix
+    numProcs      - Number of processors the matrix is split between
+    procStartInds - Range of row indices of the matrix owned by each processor
+
+  Outputs:
+    matArr        - An updated version of matArr including this matrix
   """
 
   ## Extract the CSR data from the matrix
@@ -430,12 +217,21 @@ def matSciPyToPETSc(A, matArr, key, numProcs, procStartInds):
     matArr[proc][key]["data"] = data[matArr[proc][key]["rowptr"][0]:matArr[proc][key]["rowptr"][-1]]
 
   return matArr
-  # return rowptr_dict, colval_dict, data_dict, nv_proc
 
 def vecSciPyToPETSc(b, matArr, key, numProcs, procStartInds):
   """
-  Converts the format of a NumPy vector to a dictionary
+  Converts the format of a NumPy vector to a set of dictionaries 
   that can be imported into PETSc 
+
+  Inputs:
+    b             - Vector to convert
+    matArr        - List containing the prior converted matrices and vectors
+    key           - String describing the current vector
+    numProcs      - Number of processors the vector is split between
+    procStartInds - Range of row indices of the vector owned by each processor
+
+  Outputs:
+    matArr        - An updated version of matArr including this vector
   """
   
   # b_dict = {}
@@ -448,6 +244,17 @@ def vecSciPyToPETSc(b, matArr, key, numProcs, procStartInds):
 def getProcSplit(numProcs, numRows, subCutoffs=[]):
   """
   Determines the splitting of rows among processors for parallel operations in PETSc
+
+  Inputs:
+    numProcs   - Total number of processors available
+    numRows    - Total number of rows in the matrix
+    subCutoffs - Subdomain cutoffs (for when domain decomposition is used)
+
+  Outputs:
+    rowsPerProc   - Number of rows owned by each processor
+    procStartInds - Row indices each processors ownership starts from
+    procsPerSub   - Number of processors associated with each subdomain (when domain decomposition is used)
+    procSubDs     - Subdomain each processor belongs to
   """
 
   ## Determine how many rows belong to each process
@@ -496,6 +303,17 @@ def getProcSplit(numProcs, numRows, subCutoffs=[]):
   return rowsPerProc, procStartInds, procsPerSub, procSubDs
 
 def modify_f_vector(matStruct, port_idx, basisMaps):  
+  """
+  Function to alter the driving term for simulations driving from multiple ports
+
+  Inputs:
+    matStruct - Dictionary containing each of the matrices
+    port_idx  - Index of the current port to drive from
+    basisMaps - Contains mappings between basis functions and geometric entities
+  Outputs:
+    matStruct - matStruct with the driving vector updated
+
+  """
   voltVecInds = basisMaps["portVoltVecInds"]
   voltVecVals = basisMaps["portVoltVecVals"]
   
@@ -690,9 +508,3 @@ def spai_full(A, lfil, maxit=-1, realVal=False):
   M = M_u_new.tocsr() + M_d_new.tocsr() + M_l_new.tocsc()
 
   return M
-
-if __name__ == "__main__":
-  import scipy.io as io
-  A = io.loadmat("matfile.mat")["A"]
-  cond = cond_SLEPc(A, 32)
-  print(f"Condition number for this matrix: {cond:.5e}")

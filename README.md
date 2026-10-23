@@ -2,7 +2,7 @@
 
 This document is intended to provide a basic overview of the features of the singEM package. This pacakge is primarily intend for performing electromagnetic (EM) simulations of microwave circuitry using the finite element method (FEM), with a particular emphasis on superconducting qubit geometries. To extract critical quantities such as participation ratios for these devices accurately and efficiently, this package uses specialized singular basis functions to model singular fields near metal corners[^1]. When combined with optimization techniques such as Bayesian optimization (BO), this technique can be used to rapidly design qubits with high coherence times at relatively low computational cost.
 
-This user guide will use examples to demonstrate how simulations can be configured in this package, and how the outputs can be post-processed to obtain useful figures of merit and plots of the underlying fields.
+This document will use examples to demonstrate how simulations can be configured in this package, and how the outputs can be post-processed to obtain useful figures of merit and plots of the underlying fields.
 # Environment Setup
 
 ### Windows
@@ -64,6 +64,7 @@ In general, the simulation is configured by running main with the flag "-f" poin
   "numProcs": 1 # Number of parallel processes to run the simulation with (1 = serial)
 }
 ```
+Note that a complete list of settings can be found in the docstring of `writeSimJSON()` in [JSON_util.py](./JSON_util.py). 
 
 In order to specify the properties of the volume of the cavity and its outer boundary, we include the "geomFile" above. The file [recCavity.json](./Meshes/Cavities/recCavity.json) is also included below to demonstrate how these files can be configured. The mesh file [recCavity.msh](./Meshes/Cavities/recCavity.msh) contains two "blocks": one containing all tetrahedrons in the volume of the cavity, and one containing all triangles on the outer boundary of the cavity. As shown below, the geometry configuration file gives the properties of each of these blocks. 
 
@@ -88,6 +89,7 @@ In order to specify the properties of the volume of the cavity and its outer bou
   }
 }
 ```
+As for the simulation files, more detailed documentation on the types of blocks and their available settings can be found in the docstring of `writeGeometryJSON()` in [JSON_util.py](./JSON_util.py). 
 
 For the volume block, we specify material properties such as permittivity and permeability. For the surface, in this case we just mark this block as being the outer boundary. In this version of the package, the outer boundary is always treated as a perfect electric conductor (PEC), but later versions may add support for additional boundary conditions.
 
@@ -223,9 +225,11 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
     "geomFile": "./Meshes/Microstrips/microstrip.json",
     "meshFile": "./Meshes/Microstrips/microstrip.msh", 
     "outBC": "PEC",
-    "bOrder": 2, 
- # Using 2nd order basis functions for higher accuracy   "portMatrix": false
+    "bOrder": 2, # Using 2nd order basis functions for higher accuracy   
+    "portMatrix": false # Flag indicating whether to simulate driving from all ports (true)
+                        # or from only a single port (false). If false, uses settings from the geometry file
   },
+     
   "solveP": {
     "pkg": "PETSc" # Using a solver from PETSc rather than SciPy
   },  
@@ -234,17 +238,85 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
     "saveS": true,
     "resFile": "./Results/microstrip.npz",
     "saveFields": false
-  }
+  },
+  "numProcs": 32 # Solve using 32 parallel processes (job must request 32 cores)
 }
 ```
 
 The mesh file [microstrip.msh]("./Meshes/Microstrips/microstrip.msh") contains several blocks, including two blocks for the volume, and five surface blocks. The surface blocks include one for the outer boundary, two PEC blocks for the signal trace and ground plane, and two blocks for the ports used to drive and terminate the geometry. The file is included with comments below to demonstrate how these blocks are specified:
 
 ```Python
-
+{
+  "scale": 1,
+  "volP": {
+    "num": 2, # Number of volume blocks
+    "vol0": { # Parameters of the substrate block
+      "epr": 7.0, # Relative permittivity of the substrate
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    },
+    "vol1": { # Parameters of the free-space block
+      "epr": 1.0, # Relative permittivity of free-space
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 5, # Number of surface blocks
+    "surf0": {
+      "type": "Outer" # Outer boundary
+    }, 
+    "surf1": {
+      "type": "PEC" # Signal trace
+    }, 
+    "surf2": {
+      "type": "PEC" # Ground plane
+    }, 
+    "surf3": {
+      "type": "Port", # Input port
+      "Z": 50, # Port impedance (only used if portType != "open") 
+      "portType": "Open", # Marks whetehr her the port is open-circuited ("Open") or resistive ("R")
+                          # Inductive ("L") or capacitive ("C") ports are also available options.
+                          # In these cases, "Z" gives the inductance or capacitance itself, and frequency 
+                          # scaling is applied internally
+      "width": 0.001, # Width of the port as defined in the mesh file
+      "direction": [ # Unit vector describing the direction of the port
+        0.0, 
+        1.0,
+        0.0
+      ],
+      "normal": [ # Unit vector describing the direction normal to the port
+        0.0, 
+        0.0,
+        1.0
+      ],
+      "Vsmag": 1.0 # Magnitude of the voltage being sourced to this port. 
+                   # If portType == "open", this value is interpreted as the magnitude of the current source.      
+    },
+    "surf4": { 
+      "type": "Port", # Output port
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.001,
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 0.0
+    }
+  }
+}
 ```
 
-[^1]: Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries. arXiv preprint arXiv:2606.18140.
+[^1]: [Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries. arXiv preprint arXiv:2606.18140.](https://arxiv.org/abs/2606.18140)
 
 [^2]: Jackson, J. D. (1998). Classical Electrodynamics. John Wiley & Sons.
 

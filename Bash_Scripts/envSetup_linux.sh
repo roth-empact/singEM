@@ -3,7 +3,7 @@
 # FILENAME: envSetup_linux.sh
 #SBATCH -A [ACCOUNT-NAME]
 
-#SBATCH --nodes=1 --ntasks=64 --time=4:00:00 -p cpu
+#SBATCH --nodes=1 --ntasks=64 --time=10:00 -p cpu
 
 module reset
 module load anaconda

@@ -1,7 +1,7 @@
 #!/usr/local/bin/bash
 
 # FILENAME: run_main.sh
-#SBATCH -A rothte -p cpu
+#SBATCH -A [ACCOUNT-NAME] -p cpu
 
 #SBATCH --nodes=1 --ntasks=32 --time=20:00
 

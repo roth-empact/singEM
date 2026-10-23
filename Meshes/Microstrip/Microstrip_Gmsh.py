@@ -1,6 +1,7 @@
 import gmsh
 import numpy as np
 import sys
+sys.path.append("./Meshes/")
 from Cubit2Gmsh import *
 from collections import Counter
 

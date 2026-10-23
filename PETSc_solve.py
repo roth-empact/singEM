@@ -181,6 +181,8 @@ if __name__ == "__main__":
   nv = OptDB.getInt('nv', 0) # Number of vector unknowns
   ns = OptDB.getInt('ns', 0) # Number of scalar unknowns
   simType = OptDB.getString('simType', "E")
+  outFile = OptDB.getString('outFileZ',"PETSc_resultZ.npy")
+  resFile = OptDB.getString('resFileZ',"PETSc_residualZ.npy")
   if simType == "E":
     n = nv
   elif simType == "A":
@@ -251,84 +253,7 @@ if __name__ == "__main__":
   pc.setFromOptions()
   rtol, atol, dtol, maxit = ksp.getTolerances()
   ksp.setConvergenceHistory(length=maxit)
-  
   ksp.setNormType(PETSc.KSP.NormType.UNPRECONDITIONED) # Doesn't work with MINRES
-
-  if pc.getType() == "asm": # For additive Shwarz, set up subdomains with overlap
-    A, _, _, _ = buildFDMat(matDict, freqs[0], simType, staticFlag=False) 
-    ksp.setOperators(A=A, P=A)
-    procSubD = np.load(filename, mmap_mode='r', allow_pickle=True)["procSubDs"][proc] # Subdomain for the current processor
-    totSubDs = np.load(filename, mmap_mode='r', allow_pickle=True)[f"totSubD_{procSubD}"] # All unknowns in this subdomain
-    setASMSubdomains(pc, totSubDs)
-    pc.setUp()
-
-    ## DEBUG - test the subdomain solvers to make sure they're nonsingular
-    subKSPList = pc.getASMSubKSP()
-    for jj, subKSP in enumerate(subKSPList):
-      subPC = subKSP.getPC()
-      subMat, _ = subKSP.getOperators()
-      # subLU = subPC.getFactorMatrix()
-
-      # Create a right-hand side of all ones and solve with the subsolver
-      ownRange = np.arange(subMat.owner_range[0], subMat.owner_range[1], dtype=np.int32)
-      rhs = subMat.createVecRight()
-      rhs.setValues(ownRange, np.ones((len(ownRange),), dtype=np.float64))
-      rhs.assemblyBegin()
-      rhs.assemblyEnd()
-
-      # Solve the problem, then multiply by the vector and see if the source is reconstructed
-      lhs = subMat.createVecLeft()
-      subPC.apply(rhs, lhs)
-      newRHS = subMat.createVecLeft()
-      subMat.mult(lhs, newRHS)
-      vecNorm = rhs.norm() # Norm of the original right-hand side
-      rhs.axpy(-1.0, newRHS) # Subtract the two
-      errNorm = rhs.norm() / vecNorm # Residual norm / RHS norm
-      print(f"Norm of the error for the subdomain test solve on processor {proc}: {errNorm}")
-
-      rhs.destroy()
-      lhs.destroy()
-      newRHS.destroy()
-      subMat.destroy()
-    
-    ## DEBUG - now test the global preconditioner
-    ownRange = np.arange(A.owner_range[0], A.owner_range[1], dtype=np.int32)
-    rhs = A.createVecRight()
-    rhs.setValues(ownRange, np.ones((len(ownRange),), dtype=np.float64))
-    rhs.assemblyBegin()
-    rhs.assemblyEnd()
-    lhs = A.createVecLeft()
-    pc.apply(rhs, lhs)
-    newRHS = A.createVecLeft()
-    A.mult(lhs, newRHS)
-    vecNorm = rhs.norm() # Norm of the original right-hand side
-    rhs.axpy(-1.0, newRHS) # Subtract the two
-    errNorm = rhs.norm() / vecNorm # Residual norm / RHS norm
-    if proc == 0:
-      print(f"Norm of the error for the full test solve on processor {proc}: {errNorm}")
-
-    rhs.destroy()
-    lhs.destroy()
-    newRHS.destroy()
-      
-
-  elif pc.getType() == "gasm": # For generalized additive Schwarz, do the same
-    A, _, _, _ = buildFDMat(matDict, freqs[0], simType, staticFlag=False) 
-    ksp.setOperators(A=A, P=A)
-    ownRange = A.owner_range
-    procSubD = np.load(filename, mmap_mode='r', allow_pickle=True)["procSubDs"][proc] # Subdomain for the current processor
-    if simType == "E":
-      setGASMSubdomains(pc, numSubDs, procSubD, np.arange(ownRange[0], ownRange[1], dtype=np.int32), matData["vecBasisSubDs"])
-      # locISList, ovISList = pc.GASMGetSubdomains()
-      # pc.GASMDestroySubdomains(len(ovISList), locISList, ovISList)
-    ksp.setUp()
-    pc.setUp()
-    
-    if proc == 0:
-      print(f"Finished preconditioner setup on processor {proc}")
-
-    
-
 
   if simType == "A":
     P, _, _, _ = buildFDMat(matDict, freqs[0], simType, staticFlag=True) 
@@ -493,9 +418,9 @@ if __name__ == "__main__":
       if simType == "A": # Move scalar data into xArr
         xArr[nv:,ii] = scalX0.array
       res[:,ii] /= bNorm
-      print(f"PETSc solve time for {freq/1e9:.3f} GHz: {(time.time() - start_time):.5f} s. Convergence reason: {reasons[ii]}")
-      print(f"Final relative residual: {res[np.min([itNums[ii],maxit-1]),ii]:.3e}. Iteration count: {itNums[ii]}.")
-      print(f"Exact final relative residual: {resFinal:.3e}")
+      print(f"PETSc solve time for {freq/1e9:.3f} GHz: {(time.time() - start_time):.5f} s. Convergence reason: {reasons[ii]}",flush=True)
+      print(f"Final relative residual: {res[np.min([itNums[ii],maxit-1]),ii]:.3e}. Iteration count: {itNums[ii]}.",flush=True)
+      print(f"Exact final relative residual: {resFinal:.3e}",flush=True)
 
     A.destroy()
     b.destroy()
@@ -503,11 +428,10 @@ if __name__ == "__main__":
     resVec.destroy()
     ksp.reset()
     pc.reset()
-    
     pc.destroy()
     pc = ksp.getPC()
     
   if proc == 0:
-    np.save("PETSc_result.npy", xArr)
-    np.save("PETSc_residual.npy", res)
+    np.save(outFile, xArr)
+    np.save(resFile, res)
 

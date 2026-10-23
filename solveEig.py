@@ -1,10 +1,24 @@
 import numpy as np
 import scipy.sparse as spa
 import time
-from linalg_funcs import eigs_SLEPc, matrix_remap, match_rank
+from linalg_funcs import matrix_remap, match_rank
+import subprocess, os # For working with PETSc
 
-# A function to perform eigenvalue / eigenvector extraction using the provided matrices
 def solveEig(matStruct, numEig, solveP, simType, numProcs):
+  """
+  A function to perform eigenvalue / eigenvector extraction using the provided matrices
+
+  Inputs:
+    matStruct - Dictionary containing the finite element matrices
+    numEig    - Desired number of eigenmodes
+    solveP    - Dictionary of iterative solver settings
+    simType   - Type of simulation being ran ("E", "A", or "TCS")
+    numProcs  - Number of processors available
+  Outputs:
+    eigVals   - Vector of eigenvalues for the current system
+    eigVecs   - Matrix of eigenvectors for the current system
+  
+  """
   K1 = matStruct["K1"]
   K2 = matStruct["K2"]
   Tee = matStruct["Tee"]
@@ -188,3 +202,77 @@ def solveEig(matStruct, numEig, solveP, simType, numProcs):
     eigVecs = eigVecs[:,:numEig]
   
   return eigVals, eigVecs
+
+def eigs_SLEPc(A, B, numProcs, neig, sigma=0, which="SM"):
+  """
+  A function to perform eigenvalue / eigenvector extraction using the provided matrices
+
+  Inputs:
+    A         - Left-hand side matrix for the generalized eigenvalue problem
+    B         - Right-hand side matrix for the generalized eigenvalue problem
+    numProcs  - Number of processors available
+    neig      - Desired number of eigenmodes
+    sigma     - Shift applied to the eigenvalues
+    which     - Selection of which eigenmodes to find ("SM" = smallest magnitude)
+    
+  Outputs:
+    eigVals   - Vector of eigenvalues for the current system
+    eigVecs   - Matrix of eigenvectors for the current system
+  
+  """
+  ## Extract the CSR data from each matrix
+  for ii, mat in enumerate([A, B]):
+    rowptr = mat.indptr.astype(np.int32)
+    colval = mat.indices.astype(np.int32)
+    data = mat.data      
+
+    rowptr_dict = {}
+    colval_dict = {}
+    data_dict = {}
+    nv_proc = np.zeros((numProcs,), dtype=np.int32) # Number of nonzero values per processor
+
+    ## First determine how many rows belong to each process
+    rowsPerProc = np.arange(np.floor((len(rowptr)-1) / numProcs), len(rowptr), np.floor((len(rowptr)-1) / numProcs), dtype=np.int32) # Entries assigned to each processor
+    spareRows = np.mod(len(rowptr)-1, numProcs) # Assign extra rows to the first few processes if things don't divide evenly
+    offset = 0
+    while spareRows > 0:
+      rowsPerProc[offset:] += 1
+      offset += 1
+      spareRows -= 1
+  
+    ## Then form an array to split up the data and fill it
+    for proc in range(numProcs):
+      if proc == 0:
+        rowptr_dict[f"proc{proc}"] = rowptr[:rowsPerProc[proc]+1]
+      else:
+        rowptr_dict[f"proc{proc}"] = rowptr[rowsPerProc[proc-1]:rowsPerProc[proc]+1]
+      colval_dict[f"proc{proc}"] = colval[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
+      data_dict[f"proc{proc}"] = data[rowptr_dict[f"proc{proc}"][0]:rowptr_dict[f"proc{proc}"][-1]]
+      nv_proc[proc] = rowptr_dict[f"proc{proc}"][-1]-rowptr_dict[f"proc{proc}"][0]
+
+    if ii == 0:
+      A_dict = {'rowptr': rowptr_dict, 'colval': colval_dict, 'data': data_dict, 'nv_proc': nv_proc}
+    elif ii == 1:
+      B_dict = {'rowptr': rowptr_dict, 'colval': colval_dict, 'data': data_dict, 'nv_proc': nv_proc}
+
+  ## Write the vector and csr data to a file
+  csrFile = "csrData.npz"
+  np.savez(csrFile, A=A_dict, B=B_dict)
+
+  ## Solve the system in parallel using SLEPc with MPI
+  cmd = ["mpiexec", "-n", f"{numProcs}", "python", "SLEPc_solve.py", "-n", f"{len(rowptr)-1}", \
+          "-f", csrFile, "-neig", f"{neig}", "-sigma", f"{sigma}", "-which", which]
+  print(cmd)
+  result = subprocess.run(cmd, capture_output=True, text=True)
+  print(result.stdout)
+  print(result.stderr)
+
+  ## Load in the results and eliminate the temp files
+  resFile = "SLEPc_result.npz"
+  eigpairs = np.load(resFile)
+  eigvals = eigpairs["eigvals"]
+  eigvecs = eigpairs["eigvecs"]
+  os.remove(csrFile)
+  os.remove(resFile)
+
+  return eigvals, eigvecs
