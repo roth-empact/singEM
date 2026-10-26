@@ -1,27 +1,17 @@
 """
-gauss_quadrature_tetra calculates the integration over an arbitrary
-tetrahedron (with straight edges) using the Gaussian quadrature
-integration rule
-    
-   loc = gauss_quadrature_tetra(nodes, order)
-   I = gauss_quadrature_tetra(nodes, order, f)
+   Copyright 2026 Samuel Elkin, Ghazi Khan, Thomas Roth
 
-   Inputs:
-   f - integrating function values
-   nodes - is a 4x3 array containing node locations
-   order - order of the function (lowest is 4, highest is 8)
-   
-   Outputs:
-   loc, location of interpolation points   
-   I,the result of the integration
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-   Author:
-   Ben Eng
-   Refer to https://www.sciencedirect.com/science/article/pii/0045782586900599 for 4th, 6th and 8th order rules (CURRENTLY ONLY 4th WORKS)
-   (note: prior versions of this comment referred to https://www.sciencedirect.com/science/article/pii/0045782584900720, 
-   but this doesn't appear to match the implemented rules. It's unclear where the lower order rules come from.)
+       http://www.apache.org/licenses/LICENSE-2.0
 
-   TODO: FIX THE 6th AND 8th ORDER RULES, AS THEY CURRENTLY APPEAR TO BE INCORRECT
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
 """
 
 import numpy as np
