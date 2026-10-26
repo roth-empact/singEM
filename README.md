@@ -1,14 +1,13 @@
 # singEM: A Singularity-Enriched Finite Element Solver for Electromagnetics
 
-This document is intended to provide a basic overview of the features of the singEM package. This pacakge is primarily intend for performing electromagnetic (EM) simulations of microwave circuitry using the finite element method (FEM), with a particular emphasis on superconducting qubit geometries. To extract critical quantities such as participation ratios for these devices accurately and efficiently, this package uses specialized singular basis functions to model singular fields near metal corners[^1]. When combined with optimization techniques such as Bayesian optimization (BO), this technique can be used to rapidly design qubits with high coherence times at relatively low computational cost.
+This document is intended to provide a basic overview of the features of the singEM package. This pacakge is primarily intended for performing electromagnetic (EM) simulations of microwave circuitry using the finite element method (FEM), with a particular emphasis on superconducting qubit geometries. To extract critical quantities such as participation ratios for these devices accurately and efficiently, this package uses specialized singular-field enrichment functions (also referred to as singular basis functions) to model singular fields near metal corners[^1]. When combined with optimization techniques such as Bayesian optimization (BO), this technique can be used to rapidly design qubits targeting enhanced coherence times while satisfying various constraints (e.g., qubit capacitance) at relatively low computational cost.
 
 This document will use examples to demonstrate how simulations can be configured in this package, and how the outputs can be post-processed to obtain useful figures of merit and plots of the underlying fields.
 # Environment Setup
 
 ### Windows
 
-Simulations using this package can be run locally on Windows systems, but they will not be able to access efficient parallel solvers provided by the [PETSc package](https://petsc.org/release/). I
-To set up an anaconda environment to use the package on Windows, you can run the following command in a terminal with [Anaconda](https://www.anaconda.com/download/success?reg=skipped) activated:
+Simulations using this package can be run locally on Windows systems, but they will not be able to access efficient parallel solvers provided by the [PETSc package](https://petsc.org/release/). To set up an anaconda environment to use the package on Windows, you can run the following command in a terminal with [Anaconda](https://www.anaconda.com/download/success?reg=skipped) activated:
 
 ``` Bash
 conda env create -f ./Bash_Scripts/singEM_windows.yml
@@ -16,7 +15,7 @@ conda env create -f ./Bash_Scripts/singEM_windows.yml
 
 Once the environment is set up, you can activate it and run simulations. See the "Rectangular Cavity" example in the Examples section below for instructions on how to run a basic simulation using this environment.
 
-This package provides support for mesh files from external software such as `.msh` files export from [gmsh](https://gmsh.info/), and `.inp` and `.e` files export from [Coreform Cubit](https://coreform.com/coreform-cubit/). In these examples, we will use gmsh to create and mesh each geometry, which is included in the provided Anaconda environment.
+This package provides support for mesh files from external software such as `.msh` files exported from [gmsh](https://gmsh.info/), and `.inp` and `.e` files exported from [Coreform Cubit](https://coreform.com/coreform-cubit/). In these examples, we will use gmsh to create and mesh each geometry, which is included in the provided Anaconda environment.
 
 The examples will also show how [Paraview](https://www.paraview.org/) can be used to visualize simulations results. If paraview is installed, it can be connected to this package by changing the Paraview path in [pvController.py](./PV_visualization/pvController.py). The examples will expand further upon this functionality.
 ## Linux (Cluster)
@@ -252,7 +251,7 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
   "numProcs": 32 # Solve using 32 parallel processes (job must request 32 cores)
 }
 ```
-This configuration will cause perform simulations at 101 linearly-spaced frequency steps between 1 and 10 GHz. The code is set up to use solution-space projection to interpolate solutions at a smaller subset of frequencies to this full set, so using a large number of points will not require an excessively long simulation.
+This configuration will perform simulations at 101 linearly-spaced frequency steps between 1 and 10 GHz. The code is set up to use solution-space projection to interpolate solutions at a smaller subset of frequencies to this full set, so using a large number of points will not require an excessively long simulation.
 
 The mesh file [microstrip.msh]("./Meshes/Microstrips/microstrip.msh") contains several blocks, including two blocks for the volume, and five surface blocks. The surface blocks include one for the outer boundary, two PEC blocks for the signal trace and ground plane, and two blocks for the ports used to drive and terminate the geometry. The file is included with comments below to demonstrate how these blocks are specified:
 
