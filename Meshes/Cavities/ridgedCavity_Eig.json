@@ -2,8 +2,8 @@
   "probP": {
     "type": "Eig",
     "numEig": 5,
-    "geomFile": "./Meshes/Cavities/ridgedCavity.json",
-    "meshFile": "./Meshes/Cavities/ridgedCavity.e",
+    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
+    "meshFile": "./Meshes/Cavities/ridgedCavity.msh",
     "bOrder": 2,
     "sOrder": 1
   },

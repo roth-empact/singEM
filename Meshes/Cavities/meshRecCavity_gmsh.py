@@ -35,7 +35,7 @@ gmsh.model.setPhysicalName(3, phys, "mpr1epr1") # 3 is the dimension (3D volume)
 
 blockCnt += 1
 phys=gmsh.model.addPhysicalGroup(2, cav_surfs, tag=blockCnt) # Outer boundary block
-gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), mpr1epr1 is the name
+gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), Outer is the name
 
 ## Print number of Tets
 types, elemTags, nodeTags = gmsh.model.mesh.getElements(3)

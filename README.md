@@ -47,7 +47,7 @@ gmsh.model.setPhysicalName(3, phys, "mpr1epr1") # 3 is the dimension (3D volume)
 
 blockCnt += 1
 phys=gmsh.model.addPhysicalGroup(2, cav_surfs, tag=blockCnt) # Outer boundary block
-gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), mpr1epr1 is the name
+gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), Outer is the name
 ```
 
 Here we have 2 blocks: block 1 containing all tetrahedrons forming the volume of the cavity (`cav_vol`), and block 2 with all triangles forming the outer surfaces of the cavity (`cav_surfs`). To assign properties to these blocks, we use a geometry configuration file, which in this case is [recCavity.json](./Meshes/Cavities/recCavity.json). This file is included below with comments to show how these assignments are formatted:

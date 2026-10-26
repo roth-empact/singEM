@@ -374,7 +374,7 @@ if __name__ == "__main__":
                   description='Main wrapper for finite element simulations.')
   parser.add_argument('-f', '--simFile',
                       help=".json simulation file. See writeSimJSON() for format details.",
-                      default='./Meshes/Cavities/cavity_Eig.json')
+                      default='./Meshes/Cavities/ridgedCavity_Eig.json')
   parser.add_argument('-v', '--verbose', 
                       help="Prints details about simulation status to the command line.",
                       action="store_true")
