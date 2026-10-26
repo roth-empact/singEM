@@ -20,6 +20,6 @@
     "saveFields": false,
     "fieldType": "E",
     "fFile": "fields.npy",
-    "fieldPoints": "./Meshes/Prisms/Xmon/EvalPts/xmonEvalPoints_thickMetal_xCurve.npy"
+    "fieldPoints": "./Meshes/Xmon/EvalPts/xmonEvalPoints_thickMetal_xCurve.npy"
   }
 }

@@ -12,5 +12,5 @@ cd $SLURM_SUBMIT_DIR
 hostname
 
 conda activate singEM
-python main.py -f ./Meshes/surfPart/surfPart_FD.json
+python main.py -f ./Meshes/Microstrip/microstrip_FD.json
 

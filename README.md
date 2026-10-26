@@ -220,7 +220,7 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
     "type": "FD", # Problem type is frequency domain (driven)
     "minFreq": 1e9, # Minimum frequency to solve at is 1 GHz
     "maxFreq": 10e9, # Maximum frequency to solve at is 10 GHz
-    "numSteps": 1001, # Number of frequency steps between the minimum and maximum
+    "numSteps": 101, # Number of frequency steps between the minimum and maximum
     "stepType": "linear", # Type of spacing between steps (either "linear" or "log")
     "geomFile": "./Meshes/Microstrips/microstrip.json",
     "meshFile": "./Meshes/Microstrips/microstrip.msh", 
@@ -236,12 +236,12 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
   "outP": {
     "saveV": true,
     "saveS": true,
-    "resFile": "./Results/microstrip.npz",
-    "saveFields": false
+    "resFile": "./Results/microstrip.npz"
   },
   "numProcs": 32 # Solve using 32 parallel processes (job must request 32 cores)
 }
 ```
+This configuration will cause perform simulations at 101 linearly-spaced frequency steps between 1 and 10 GHz. The code is set up to use solution-space projection to interpolate solutions at a smaller subset of frequencies to this full set, so using a large number of points will not require an excessively long simulation.
 
 The mesh file [microstrip.msh]("./Meshes/Microstrips/microstrip.msh") contains several blocks, including two blocks for the volume, and five surface blocks. The surface blocks include one for the outer boundary, two PEC blocks for the signal trace and ground plane, and two blocks for the ports used to drive and terminate the geometry. The file is included with comments below to demonstrate how these blocks are specified:
 
@@ -315,6 +315,217 @@ The mesh file [microstrip.msh]("./Meshes/Microstrips/microstrip.msh") contains s
   }
 }
 ```
+
+Because this job is configured to use PETSc to solve the linear system, it must be ran on a cluster or another linux system with petsc4py available (such as through the provided environment file, see Environment Setup above). If run on a cluster, the job should request at least 32 cores to match the "numProcs" setting in [microstrip_FD.json](./Meshes/Microstrip/microstrip_FD.json) above (or this setting can be changed). Within the job, the simulation is ran via
+
+```Bash
+python main.py -f "./Meshes/Microstrip/microstrip_FD.json"
+```
+
+In addition to the output file produced by the job, the outputs of the simulation are stored in "./Results/microstrip.npz" as specified by "resFile" in [microstrip_FD.json](./Meshes/Microstrip/microstrip_FD.json). We've included a script to demonstrate how these results can be plotted in [microstripPlots.py](./Plotting/microstripPlots.py). Running this script after the simulation will generate the following plots of the S-parameters of this device:
+
+![Plot of the S11 curve for a microstrip line](./Results/microstrip_S11.png)
+
+![Plot of the S21 curve for a microstrip line](./Results/microstrip_S21.png)
+
+
+## Superconducting Qubit (Singular Driven Simulation)
+We now examine a simulation where we use singular basis functions to accurately extract participation ratios for thin interface layers using a coarse mesh. The mesh used for this simulation is [qubit_10umTrench.msh](./Meshes/Qubit/qubit_10umTrench.msh), which is generated using [meshQubit_gmsh.py](./Meshes/Qubit/meshQubit_gmsh.py). To visualize this mesh in Paraview, we first convert to an Exodus file using the following command:
+
+```Bash
+python .\gmshToExo.py -g ".\Meshes\Qubit\qubit_10umTrench.msh" -e ".\Meshes\Qubit\qubit_10umTrench.e"
+```
+
+The resulting Exodus file can then be loaded into Paraview and visualized. We plot a cross section of this mesh with each of its blocks false-colored below. Note that the interface layers are NOT included as volumes in this mesh, and are instead represented as surfaces on the metal and substrate. The properties of each layer (such as height and permittivity) are described in the geometry configuration file to incorporate their effects.
+
+![Visualization of the qubit mesh with its blocks false colored](./Results/qubitMesh_inset.png)
+
+Below, we provide a commented version of the geometry configuration file [qubitSurfPart.json](./Meshes/Qubit/qubitSurfPart.json). In the comments, the color of each block in the above image is provided in parentheses:
+
+```Python
+{
+  "scale": 1e-3, # The mesh is defined in mm, so it needs to be rescaled
+  "volP": {
+    "num": 2, # Volume blocks for the substrate and free space
+    "vol0": { # Substrate (green)
+      "epr": 11.45,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    },
+    "vol1": { # Free space (not pictured)
+      "epr": 1.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 14,
+    "surf0": { # Outer boundary, which is connected to the ground plane (gray)
+      "type": "Outer"
+    },
+    "surf1": { # Left pad (blue)
+      "type": "PEC"
+    },
+    "surf2": { # Right pad (purple)
+      "type": "PEC" 
+    },
+    "surf3": { # Josephson junction, treated as a port to drive the geometry (yellow)
+      "type": "Port",
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.00292,
+      "direction": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 1.0
+    },
+    "surf4": { # Metal-air interface on the top of the ground plane (gray)
+      "type": "Output", # Indicates that this block is for specifying an output quantity
+      "fieldType": "surfPart", # The desired output quantity is the surface participation
+      "thickness": 3e-6, # Thickness of the interface layer associated with this surface (which is NOT)
+      "vol": 1, # Which volume block this interface layer would lie in. Since this is the metal-air interface, 
+                # it would sit on the free-space side (in vol1)
+      "epr": 5.0 # Permittivity of the interface layer
+    },
+    "surf5": { # Metal-air interface on the top of the left pad (blue)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    },
+    "surf6": { # Metal-air interface on the top of the right pad (purple)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    },
+    "surf7": { # Metal-air interface on the sides of the ground plane (gray)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    },
+    "surf8": { # Metal-air interface on the sides of the left pad (blue)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    },
+    "surf9": { # Metal-air interface on the sides of the right pad (purple)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    },
+    "surf10": { # Metal-substrate interface below the ground plane (gray)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0, # Since this is the metal-substrate interface, it would instead lie in vol0
+      "epr": 5.0
+    },
+    "surf11": { # Metal-substrate interface below the left plane (blue)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 5.0
+    },
+    "surf12": { # Metal-substrate interface below the right plane (purple)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 5.0
+    },
+    "surf13": { # Substrate-air interface (green)
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 5.0
+    }
+  },
+  "lineP": {
+    "num": 1,
+    "line0": { # Singular lines (highlighted in pink)
+      "type": "singLine", 
+      "coeff": 0.667
+    }
+  }
+}
+```
+In the mesh file, all conductive edges at 90 degree angles are marked as singular (and thus included in the line block). However, we add a 1 um gap between the port and the singular lines, as the singular basis functions do not function well when included on triangles along the port surface.
+
+Once the geometry settings are specified, the simulation can be configured in [qubit_FD.json](./Meshes/Qubit/qubit_FD.json). These settings are also included below with comments. 
+
+```Python
+{
+  "probP": {
+    "type": "FD",
+    "minFreq": 5e9,
+    "maxFreq": 5e9,
+    "numSteps": 1, # Perform a single solve at 5 GHz to get the participation ratios there
+    "stepType": "linear",
+    "geomFile": "./Meshes/Qubit/qubitSurfPart.json",
+    "meshFile": "./Meshes/Qubit/qubit_10umTrench.msh",
+    "bOrder": 2,
+    "sOrder": 3 # Using 3rd order singular functions for improved accuracy
+  },
+  "solveP": {
+    "pkg": "PETSc" # Using PETSc to solve the linear system
+  },
+  "outP": {
+    "saveV": true,
+    "saveS": false,
+    "resFile": "./Results/qubitSurfPart.npz",
+    "fieldPoints": "./Meshes/Qubit/EvalPts/qubitEvalPoints_topEdge.npy" # Saving field values at a pre-selected set of points for plotting purposes
+  },
+  "numProcs": 32
+}
+```
+In the output parameters above, we include "fieldPoints," which points to a .npy file containing coordinates for a set of points we wish to evaluate the electric field at. An example of how to generate this file is provided in [qubitEvalPoints_rectangle.py](./Meshes/Qubit/EvalPts/qubitEvalPoints_rectangle.py). Later, we will show how the evaluations at these points can be used to plot the corresponding behavior in Paraview. A similar process can also be used to evaluate fields along lines near the singular edges and analyze the singular behavior using a 1D plot[^1]. 
+
+Once again, we run the simulation within a job by pointing to the configuration file with the following command:
+```Bash
+python main.py -f "./Meshes/Qubit/qubit_FD.json"
+```
+
+Because the geometry file above marks some of the surface blocks as output surfaces with participation ratio calculations associated with them, the output file will contain these ratios. Below, we include the participation ratios for this geometry, where the surfaces are numbered to match the ordering in [qubitSurfPart.json](./Meshes/Qubit/qubitSurfPart.json). In the output below, we comment in the labelings for each surface for clarity:
+```Bash
+Current frequency: 5.00000 GHz
+Voltage at port 0: 0.00000+527.91179j V
+Output surface 0 surfPart integral: 2.01404e-08+0.00000e+00j # Top ground MA
+Output surface 1 surfPart integral: 8.08471e-07+0.00000e+00j # Top left pad MA
+Output surface 2 surfPart integral: 8.39604e-07+0.00000e+00j # Top right pad MA
+Output surface 3 surfPart integral: 2.47962e-10+0.00000e+00j # Side ground MA
+Output surface 4 surfPart integral: 3.02013e-08+0.00000e+00j # Side left pad MA
+Output surface 5 surfPart integral: 3.05606e-08+0.00000e+00j # Side right pad MA
+Output surface 6 surfPart integral: 2.22659e-06+0.00000e+00j # Ground MS
+Output surface 7 surfPart integral: 7.00609e-05+0.00000e+00j # Left pad MS
+Output surface 8 surfPart integral: 6.95410e-05+0.00000e+00j # Right pad MS
+Output surface 9 surfPart integral: 3.69139e-05+0.00000e+00j # SA
+```
+Note that this mesh is different than that used in our publication on the singular functions[^1], so the results are slightly different.
+
+To visually demonstrate the effectiveness of the singular basis functions, we can import the plotting points from the "fieldPoints" file provided in [qubit_FD.json](./Meshes/Qubit/qubit_FD.json) into Paraview. To do this, we first convert the set of points and field values into a .vtk file, which can be done using the provided [singularityPlot_2D_paraview.py](./Plotting/singularityPlot_2D_paraview.py) script. We can load the .vtk file output by this script into Paraview and plot the field distribution in this region over the mesh, where singular behavior is clearly being captured by the singular basis functions.
+
+![A region of the qubit mesh with the field distribution overlaid](./Results/qubitFields.png)
+
 
 [^1]: [Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries. arXiv preprint arXiv:2606.18140.](https://arxiv.org/abs/2606.18140)
 

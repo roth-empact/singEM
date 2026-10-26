@@ -306,7 +306,7 @@ def getOutInts_tets(x, connLists, outList, outEdgeList, outFaceList, outTetList,
       # _, totFieldEnergy[ii] = getTotField(connLists, basisMaps, singEleLists, simType, quadOrder, basisOrder, x, probType, "E", "all", 2*np.pi*freq)
       if simType == "E": # TODO: Add calculation for A-phi
         totFieldEnergy[ii] = np.real(x[:,ii].conj().T @ matStruct["K2"] @ x[:,ii]) / 2
-    print(f"Electric field energy integrated over the full geometry: {totFieldEnergy} J")
+    # print(f"Electric field energy integrated over the full geometry: {totFieldEnergy} J")
 
     singEleCoeffs = singEleLists[f"singTetCoeffs"]
     singCoeffs = np.unique(singEleCoeffs[singEleCoeffs != 0])
@@ -832,8 +832,6 @@ def getPointFields(fieldPoints, connLists, basisMaps, singEleLists, simType, pro
   N_tet = len(connLists["tetList"])
   mu0 = 4e-7*np.pi
   for ii, point in enumerate(fieldPoints):
-    if ii == 2680:
-      print(f"Looking at point {ii} at location {point}")
     # First isolate which element the point is in
     pointDist = np.linalg.norm(nodeCoords - point, axis=1) # Calculate the distance from each node to the point
     nearNodes = np.argsort(pointDist) # Sort the nodes closest to the point to find the tet it's in

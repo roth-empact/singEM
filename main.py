@@ -153,7 +153,7 @@ def main(simFile, verbose):
               resDict["sMats"] = sMats
             
             if verbose:
-              print(f"\nResults for pass {passNum}:")
+              print(f"\nSimulation Results:")
               for ii in range(len(freqs)):
                 print(f"Current frequency: {(freqs[ii]/1e9):.5f} GHz")
                 for portNum in range(numPorts):
@@ -374,7 +374,7 @@ if __name__ == "__main__":
                   description='Main wrapper for finite element simulations.')
   parser.add_argument('-f', '--simFile',
                       help=".json simulation file. See writeSimJSON() for format details.",
-                      default='./Meshes/Microstrip/microstrip_FD.json')
+                      default='./Meshes/Qubit/qubit_FD.json')
   parser.add_argument('-v', '--verbose', 
                       help="Prints details about simulation status to the command line.",
                       action="store_true")

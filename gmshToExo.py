@@ -2,8 +2,10 @@ import numpy as np
 import meshio
 import netCDF4
 import sys
+import argparse
 sys.path.append("./")
 from readgmshMesh import readGmsh
+
 
 def gmshToExo(gmshFile, exoFile):
   """ 
@@ -15,7 +17,7 @@ def gmshToExo(gmshFile, exoFile):
     exoFile  - Desired path to the exodus (.e) mesh file
   """
 
-  nodeList, tetList, wedgeList, volStartInds, volEleTypes, triList, quadList, surfStartInds, surfEleTypes, lineList, lineStartInds = readGmsh(gmshFile)
+  nodeList, tetList, wedgeList, volStartInds, volEleTypes, triList, quadList, surfStartInds, surfEleTypes, lineList, lineStartInds, blockNames = readGmsh(gmshFile, getBlockNames=True)
   points = nodeList[:,1:] # Points for each node
 
   ## Group all cells into a list
@@ -78,14 +80,6 @@ def gmshToExo(gmshFile, exoFile):
         # 33 is the standard historical character limit for Exodus names
         ds.createDimension("len_name", 33) 
       ds.createVariable("eb_names", "S1", ("num_el_blk", "len_name"))
-
-    blockNames = []
-    for ii in range(len(volStartInds)):
-      blockNames.append(f"vol_{ii}")
-    for ii in range(len(surfStartInds)):
-      blockNames.append(f"surf_{ii}")
-    for ii in range(len(lineStartInds)):
-      blockNames.append(f"line_{ii}")
     
     # Write strings converted to bytes to the eb_names array
     for ii, name in enumerate(blockNames):
@@ -96,6 +90,15 @@ def gmshToExo(gmshFile, exoFile):
 
 
 if __name__ == "__main__":
-  gmshFile = "./Meshes_Open/Microstrip/microstrip.msh"
-  exoFile = "./Meshes_Open/Microstrip/microstrip.e"
-  gmshToExo(gmshFile, exoFile)
+  parser = argparse.ArgumentParser(
+                    prog='main.py',
+                    description='Main wrapper for finite element simulations.')
+  parser.add_argument('-g', '--gmshFile',
+                      help="Path to the gmsh file to read from. Should end with .msh extension",
+                      default='./Meshes/Qubit/qubit_10umTrench.msh')
+  parser.add_argument('-e', '--exoFile', 
+                      help="Path to the exodus file to write to. Should end with .e extension.",
+                      default='./Meshes/Qubit/qubit_10umTrench.e')
+  args = parser.parse_args()
+
+  gmshToExo(args.gmshFile, args.exoFile)

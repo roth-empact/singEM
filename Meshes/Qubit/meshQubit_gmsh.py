@@ -1,6 +1,7 @@
 import gmsh
 import numpy as np
 import sys
+sys.path.append("./Meshes/")
 from Cubit2Gmsh import *
 from collections import Counter
 
@@ -8,25 +9,20 @@ gmsh.initialize()
 gmsh.model.add("model")
 
 #### Numbers to vary ####
-PadX=423.387643683363024e-3
-PadY=527.561567885137720e-3
-Junc_len=20.000000000000000e-3
-Pad2GndY_U=259.783698034966847e-3
-Pad2GndY_D=312.583345919840667e-3
-Pad2GndX_L=102.537884419986483e-3
-Pad2GndX_R=108.667077396590656e-3
-trenchZ=19.078889314811292e-3
-PJunc_W=20e-3
+PadX=120e-3
+PadY=500e-3
+Junc_len=20e-3
+Pad2GndY_U=80e-3
+Pad2GndY_D=80e-3
+Pad2GndX_L=150e-3
+Pad2GndX_R=150e-3
+trenchZ=10e-3
+PJunc_W=3e-3
 k_val=0
-# dir_GK=sys.argv[6]
-# iter_GK=sys.argv[7]
-
-
 
 #### constant for now####
-n_val=200
-
-Full_Gnd=3000e-3
+n_val=5
+Full_Gnd=1000e-3
 
 #### Numbers that don't vary ####
 PortX=0.002
@@ -34,7 +30,7 @@ PortY=0.002923
 lenX=1e3*(2*PadX+2*Junc_len+Pad2GndX_L+Pad2GndX_R+PortX)
 lenY=1e3*(PadY+Pad2GndY_U+Pad2GndX_L)
 metal_thick=0.0001
-metalHeight=metal_thick ## defined twice cause copying some Sam's mesh code
+metalHeight=metal_thick 
 botZPos=-metal_thick/2
 ParaPadX_s=0.08
 ParaPadX_e=0.12
@@ -55,7 +51,7 @@ AirBoxZ=0.5-metal_thick
 ## Some shifts that were defined to match the paper IBM geometry but not necessary for optimization
 ShiftX=0#0.007142
 Junc_ShiftY=0#0.0014615
-ShiftY=-PadY/2+100e-3#-0.033871
+ShiftY=0#-PadY/2+100e-3#-0.033871
 
 ### Make Port
 GapX = 2*PadX + PortX + 2*Junc_len + Pad2GndX_L+Pad2GndX_R
@@ -405,8 +401,8 @@ gmsh.model.mesh.field.setNumbers(distance, "SurfacesList", [portSurf])
 threshold = gmsh.model.mesh.field.add("Threshold")
 gmsh.model.mesh.field.setNumber(threshold, "InField", distance)
 
-gmsh.model.mesh.field.setNumber(threshold, "SizeMin", 0.001)
-gmsh.model.mesh.field.setNumber(threshold, "SizeMax", 0.15)
+gmsh.model.mesh.field.setNumber(threshold, "SizeMin", 0.005)
+gmsh.model.mesh.field.setNumber(threshold, "SizeMax", 0.3)
 
 # Distance over which the transition occurs
 gmsh.model.mesh.field.setNumber(threshold, "DistMin", 0.0)
@@ -496,8 +492,8 @@ blockCnt += 1
 phys = gmsh.model.addPhysicalGroup(1, singLines, blockCnt)
 gmsh.model.setPhysicalName(1, phys, "singLines")
 
-# # gmsh.write(f"{dir_GK}/Gmsh_PadX_{(PadX*1e3):.3g}_PadY_{(PadY*1e3):.3g}_Junclen_{(Junc_len*1e3):.3g}_Pad2GndX_{(Pad2GndX*1e3):.3g}_Pad2GndY_{(Pad2GndY*1e3):.3g}_TaperW_{(PJunc_W*1e3):.3g}_TrenchZ_{(trenchZ*1e3):.3g}_test_{iter_GK}.msh")
-gmsh.write("NewRun_low.step")
+gmsh.write(f"./Meshes/Qubit/qubit_10umTrench.msh")
+# gmsh.write("NewRun_low.step")
 gmsh.model.occ.synchronize()
 if "-nopopup" not in sys.argv:
     gmsh.fltk.run()

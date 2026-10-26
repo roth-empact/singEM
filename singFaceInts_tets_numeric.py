@@ -21,7 +21,7 @@ def singFaceInts(coeff, cornerCoeff, basisOrder, singOrder, numSplit):
   faceNums = np.array([[0,1,2], [0,1,3], [0,2,3], [1,2,3]], dtype=np.int32)
 
   # Split the triangles into a set of smaller triangles, and define integration points on each
-  splitCoords, _, _, _, _, totTriList, surfStartInds, _, _, _, _ = readAbq(f"./Test_Files/Singular_testing/tetSplit_numSplit={numSplit}_tris.inp")
+  splitCoords, _, _, _, _, totTriList, _, surfStartInds, _, _, _, _, _ = readAbq(f"./Test_Files/Singular_testing/tetSplit_numSplit={numSplit}_tris.inp")
   totTriList -= 1 # Shift by 1 to account for python vs Cubit numbering
   splitCoords = splitCoords[:,1:] # Remove the node indices
   splitTriList = [totTriList[surfStartInds[ii]:surfStartInds[ii+1]] for ii in range(len(surfStartInds)-1)]

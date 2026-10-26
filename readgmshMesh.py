@@ -3,26 +3,27 @@ import numpy as np
 
 '''
 
-Following Doc copied from readAbaqusMesh.py
-*****
 This function reads an gmsh (.msh) file and returns connectivity information about the mesh
-        Inputs:
-        fName - filepath for .inp file
+    Inputs:
+        fName         - filepath for .msh file
+        getBlockNames - Flag indicating whether to return block names (for plotting purposes)
 
-        Outputs:
+    Outputs:
         nodes         - node numbers and coordinates of each node
         tets          - element number and node indices for each tetrahedral element
         wedges        - element numbers and node indices for "wedge" (triangular prism) elements
         volStartInds  - indices marking the start of each new block (for marking material parameters)
         volEleTypes   - element type associated with each start index in 'volStartInds'
         tris          - node indices for triangles on each surface
-        surfStartInds - indices marking the start of each new block (for marking surface types)
-*****
-
-Please feel free to use this however you please. 
+        quads         - node indices for quadrilaterals on each surfaces
+        surfStartInds - indices marking the start of each new block (for marking surface types) 
+        surfEleTypes  - element type associated with each start index in 'surfStartInds'
+        lines         - node indices forming each line element
+        lineStartInds - indices marking the start of each new block of line elements
+        blockNames    - Names of the blocks as defined in gmsh (only returned if getBlockNames == True)
 '''
 
-def readGmsh(filename):
+def readGmsh(filename, getBlockNames=False):
     mesh = meshio.read(filename)
     points = mesh.points
     nodes = []
@@ -36,14 +37,10 @@ def readGmsh(filename):
     surfStartInds = []
     surfEleTypes = []
     lineStartInds = []
+    blockNames = []
 
     # Storing the nodes and their indices
-    for i in range(len(points)):
-        nodes.append([i, 
-                  float(points[i][0]),
-                  float(points[i][1]),
-                  float(points[i][2])])
-    nodes = np.array(nodes)
+    nodes = np.hstack([np.arange(len(points))[:,None], points])
 
     # Sorting the group_name alphabetically for the JSON
     #sort_dict = dict(sorted(mesh.cell_sets.items()))
@@ -68,6 +65,7 @@ def readGmsh(filename):
         # Unknown group_name. Don't think it is of any importance
         if group_name == 'gmsh:bounding_entities':
             continue
+        blockNames.append(group_name)
         
         iter = 1
         # Known group_names. Iterating through the shape (cell type) each group name is made of
@@ -113,7 +111,11 @@ def readGmsh(filename):
                 lines = np.append(lines, mesh.cells[cells_index].data, axis=0)
             else:
                 raise Exception("Unrecognized element type")
-    return [nodes, tets, wedges, volStartInds, volEleTypes, tris, quads, surfStartInds, surfEleTypes, lines, lineStartInds]
+
+    if getBlockNames:
+        return [nodes, tets, wedges, volStartInds, volEleTypes, tris, quads, surfStartInds, surfEleTypes, lines, lineStartInds, blockNames]
+    else:
+        return [nodes, tets, wedges, volStartInds, volEleTypes, tris, quads, surfStartInds, surfEleTypes, lines, lineStartInds]
 
 
 
