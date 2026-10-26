@@ -74,7 +74,7 @@ Here we have 2 blocks: block 1 containing all tetrahedrons forming the volume of
 ```
 For the volume block, we specify material properties such as permittivity and permeability. For the surface, in this case we just mark this block as being the outer boundary. In this version of the package, the outer boundary is always treated as a perfect electric conductor (PEC), but later versions may add support for additional boundary conditions. Note that more detailed documentation on the types of blocks and their available settings can be found in the docstring of `writeGeometryJSON()` in [JSON_util.py](./JSON_util.py). Examples of more complicated block definitions such as ports and singular lines will also be included in later examples.
 
-FEM simulations are performed by running [main.py](./main.py) with the flag `-f` pointing to a simulation configuration file, which specifies settings of the simulation itself. The configuration file used for this example is [cavity_Eig.json](./Meshes/Cavities/cavity). The contents of the file are included below, with comments indicating what each setting does:
+FEM simulations are performed by running [main.py](./main.py) with the flag `-f` pointing to a simulation configuration file, which specifies settings of the simulation itself. The configuration file used for this example is [cavity_Eig.json](./Meshes/Cavities/cavity_Eig.json). The contents of the file are included below, with comments indicating what each setting does:
 
 ```Python
 {
@@ -103,7 +103,7 @@ FEM simulations are performed by running [main.py](./main.py) with the flag `-f`
 ```
 Note that a complete list of settings can be found in the docstring of `writeSimJSON()` in [JSON_util.py](./JSON_util.py). 
 
-Once the settings are configured, the simulation can be ran using the following command
+Once the settings are configured, the simulation can be ran using the following command:
 
 ```Bash
 python main.py -f "./Meshes/Cavities/cavity_Eig.json"
@@ -151,35 +151,24 @@ Next, we consider another eigenmode problem in the form of a ridged waveguide ca
 
 ![Plot of an eigenmode of the rectangular cavity](./Results/ridgedCavity_Eig.png)
 
-In order to resolve this mode accurately with a coarse mesh, we include singular basis functions in the tetrahedrons contacting this metal edge. In the simulation file [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), we add another setting to specify the singular basis function order:
+In order to resolve this mode accurately with a coarse mesh, we include singular basis functions in the tetrahedrons contacting this metal edge. To accomodate these singular edges in the mesh, we add another block containing the set of mesh edges along the singular features in the mesh file [meshRidgedCavity_gmsh.py](./Meshes/Cavities/meshRidgedCavity_gmsh.py). The excerpt of this script creating the blocks is included below:
 
 ```Python
-{
-  "probP": {
-    "type": "Eig",
-    "numEig": 5,
-    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
-    "meshFile": "./Meshes/Cavities/ridgedCavity.e",
-    "bOrder": 1,
-    "sOrder": 1 # Order of singular basis functions
-  },
-  "solveP": {
-    "pkg": "SciPy",
-    "shift": 20e9,
-    "tol": 1e-06
-  },
-  "outP": {
-    "resFile": "./Results/ridgedCavity_p=1,s=1.npz",
-    "saveFields": true,
-    "fieldType": "E",
-    "fFile": "fields.npy"
-  },
-  "numProcs": 1
-}
+## Make Blocks
+blockCnt = 1
+phys=gmsh.model.addPhysicalGroup(3, [cav_vol], blockCnt) # Block for the cavity volume
+gmsh.model.setPhysicalName(3, phys, "mpr1epr1") # 3 is the dimension (3D volume), mpr1epr1 is the name
+
+blockCnt += 1
+phys=gmsh.model.addPhysicalGroup(2, cav_surfs, tag=blockCnt) # Outer boundary block
+gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), Outer is the name
+
+blockCnt += 1
+phys=gmsh.model.addPhysicalGroup(1, singLines, tag=blockCnt) # Singular line block
+gmsh.model.setPhysicalName(1, phys, "singLines") # 1 is the dimension (1D edges), singLines is the name
 ```
 
-These functions are only included in tetrahedrons contacting singular edges in the geometry. These edges are marked by blocks in the geometry, as can be seen in the geometry file [ridgedCavity_sing.json](./Meshes/Cavities/ridgedCavity_sing.json):
-
+Then within the geometry file [ridgedCavity_sing.json](./Meshes/Cavities/ridgedCavity_sing.json), we mark this block as being a set of singular lines and assign the coefficient describing the singular behavior:
 ```Python
 {
   "scale": 1,
@@ -203,14 +192,40 @@ These functions are only included in tetrahedrons contacting singular edges in t
     "line0": {
       "type": "singLine", # Marks that singular basis functions should be added
                           # to tets touching nodes or edges along this line
-      "coeff": 0.667 # Coefficient of the singularity
+      "coeff": 0.667 # Coefficient of the singularity (2/3 for 90 degree metal wedges)
     }
   }
 }
 
 ```
-
 In the current version of the code, integrals of the singular basis functions are pre-calculated for a unit tetrahedron and rescaled to the dimensions of each tetrahedron in the mesh[^1]. This step has been performed in advance for coefficients of 1/2 and 2/3 to match the expected behavior near metal wedges at 0 and 90 degree angles respectively [^2], and the resulting integrals are stored in [BasisMats](./BasisMats/). If alternative coefficients are needed, additional files can be generated using [singBasisMats_tets_numeric.py](singBasisMats_tets_numeric.py).
+
+In the simulation file [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), we add another setting to specify the singular basis function order:
+
+```Python
+{
+  "probP": {
+    "type": "Eig",
+    "numEig": 5,
+    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
+    "meshFile": "./Meshes/Cavities/ridgedCavity.msh",
+    "bOrder": 1,
+    "sOrder": 1 # Order of singular basis functions
+  },
+  "solveP": {
+    "pkg": "SciPy",
+    "shift": 20e9,
+    "tol": 1e-06
+  },
+  "outP": {
+    "resFile": "./Results/ridgedCavity_p=1,s=1.npz",
+    "saveFields": true,
+    "fieldType": "E",
+    "fFile": "fields.npy"
+  },
+  "numProcs": 1
+}
+```
 
 Once again, we can run the simulation as configured above using
 
@@ -218,7 +233,7 @@ Once again, we can run the simulation as configured above using
 python main.py -f "./Meshes/Cavities/cavity_Eig.json"
 ```
 
-For eigenvalue 0, the singular basis functions give an eigenvalue of `31.44299 GHz`, giving a percent error of `1.09%` relative to the value of `31.76373 GHz` obtained using 2nd order functions on a dense mesh. If we remove the singular basis functions by changing "geomFile" in [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), the resulting eigenvalue is `30.76217 GHz`, meaning the percent error is increased to `3.15%`. A more detailed comparison of the performance can be found in our publication on the singular functions [^1].
+For eigenvalue 0, the singular basis functions give an eigenvalue of `31.02635 GHz`, giving a percent error of `2.32%` relative to the value of `31.76373 GHz` obtained using 2nd order functions on a dense mesh. If we remove the singular basis functions by changing "geomFile" in [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), the resulting eigenvalue is `30.34435 GHz`, meaning the percent error is increased to `4.47%`. A more detailed comparison of the performance can be found in our publication on the singular functions [^1].
 
 ## Microstrip (Driven Simulation)
 

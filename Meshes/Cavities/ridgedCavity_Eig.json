@@ -2,9 +2,9 @@
   "probP": {
     "type": "Eig",
     "numEig": 5,
-    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
+    "geomFile": "./Meshes/Cavities/ridgedCavity.json",
     "meshFile": "./Meshes/Cavities/ridgedCavity.msh",
-    "bOrder": 2,
+    "bOrder": 1,
     "sOrder": 1
   },
   "solveP": {

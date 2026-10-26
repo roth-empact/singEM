@@ -36,13 +36,13 @@ for curve in cav_curves:
             singLines.append(curve)
 
 ## Set mesh settings
-target_size = 0.001 # Target for the average edge length of the tets
+target_size = 1.1e-3 # Target for the average edge length of the tets
 gmsh.option.setNumber("Mesh.MeshSizeMin", target_size)
 gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
 
 ## Generate the mesh
 gmsh.option.setNumber("Mesh.Algorithm", 6)
-gmsh.option.setNumber("Mesh.Algorithm3D", 4)
+gmsh.option.setNumber("Mesh.Algorithm3D", 10)
 gmsh.model.mesh.generate(2)
 gmsh.model.mesh.generate(3)
 
