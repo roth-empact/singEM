@@ -3,8 +3,8 @@
     "type": "Eig",
     "numEig": 5,
     "geomFile": "./Meshes/Cavities/ridgedCavity.json",
-    "meshFile": "./Meshes/Cavities/ridgedCavity.e",
-    "bOrder": 2,
+    "meshFile": "./Meshes/Cavities/ridgedCavity.msh",
+    "bOrder": 1,
     "sOrder": 1
   },
   "solveP": {

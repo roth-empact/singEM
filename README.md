@@ -1,20 +1,21 @@
 # singEM: A Singularity-Enriched Finite Element Solver for Electromagnetics
 
-This document is intended to provide a basic overview of the features of the singEM package. This pacakge is primarily intend for performing electromagnetic (EM) simulations of microwave circuitry using the finite element method (FEM), with a particular emphasis on superconducting qubit geometries. To extract critical quantities such as participation ratios for these devices accurately and efficiently, this package uses specialized singular basis functions to model singular fields near metal corners[^1]. When combined with optimization techniques such as Bayesian optimization (BO), this technique can be used to rapidly design qubits with high coherence times at relatively low computational cost.
+This document is intended to provide a basic overview of the features of the singEM package. This pacakge is primarily intended for performing electromagnetic (EM) simulations of microwave circuitry using the finite element method (FEM), with a particular emphasis on superconducting qubit geometries. To extract critical quantities such as participation ratios for these devices accurately and efficiently, this package uses specialized singular-field enrichment functions (also referred to as singular basis functions) to model singular fields near metal corners[^1]. When combined with optimization techniques such as Bayesian optimization (BO), this technique can be used to rapidly design qubits targeting enhanced coherence times while satisfying various constraints (e.g., qubit capacitance) at relatively low computational cost.
 
 This document will use examples to demonstrate how simulations can be configured in this package, and how the outputs can be post-processed to obtain useful figures of merit and plots of the underlying fields.
 # Environment Setup
 
 ### Windows
 
-Simulations using this package can be run locally on Windows systems, but they will not be able to access efficient parallel solvers provided by the [PETSc package](https://petsc.org/release/). I
-To set up an anaconda environment to use the package on Windows, you can run the following command in a terminal with [Anaconda](https://www.anaconda.com/download/success?reg=skipped) activated:
+Simulations using this package can be run locally on Windows systems, but they will not be able to access efficient parallel solvers provided by the [PETSc package](https://petsc.org/release/). To set up an anaconda environment to use the package on Windows, you can run the following command in a terminal with [Anaconda](https://www.anaconda.com/download/success?reg=skipped) activated:
 
 ``` Bash
 conda env create -f ./Bash_Scripts/singEM_windows.yml
 ```
 
 Once the environment is set up, you can activate it and run simulations. See the "Rectangular Cavity" example in the Examples section below for instructions on how to run a basic simulation using this environment.
+
+This package provides support for mesh files from external software such as `.msh` files exported from [gmsh](https://gmsh.info/), and `.inp` and `.e` files exported from [Coreform Cubit](https://coreform.com/coreform-cubit/). In these examples, we will use gmsh to create and mesh each geometry, which is included in the provided Anaconda environment.
 
 The examples will also show how [Paraview](https://www.paraview.org/) can be used to visualize simulations results. If paraview is installed, it can be connected to this package by changing the Paraview path in [pvController.py](./PV_visualization/pvController.py). The examples will expand further upon this functionality.
 ## Linux (Cluster)
@@ -35,9 +36,45 @@ In the following examples, we walk through the steps to set up simulations of va
 
 ## Rectangular Cavity (Basic Eigenmode Simulation)
 
-We first look at an example of how to extract the eigenmodes of a simple rectangular cavity using SciPy. This example can be performed locally on a Windows machine or on a cluster, but we will assume it is being done locally. Subsequent examples will use PETSc for more efficient solutions.
+We first look at an example of how to extract the eigenmodes of a simple rectangular cavity using SciPy to solve the system of equations generated using FEM. This example can be performed locally on a Windows machine or on a cluster, but we will assume it is being done locally. Subsequent examples will use PETSc for more efficient solutions.
 
-In general, the simulation is configured by running main with the flag "-f" pointing to a simulation configuration file.The primary configuration file used to specify the settings used to run this example is [cavity_Eig.json](./Meshes/Cavities/cavity). The contents of the file are included below, with comments indicating what each setting does:
+Before running the simulation, we need to draw a geometry, mesh it, and assign material properties and boundary conditions to the volumes and surfaces. The geometry creation and meshing for this example is performed in [meshRecCavity_gmsh.py](./Meshes/Cavities/meshRecCavity_gmsh.py), which can be referenced for more details on basic geometry creation and mesh generation. Within this file, we also create a set of "blocks" to identify the volumes and surfaces with unique material properties and boundary conditions. We include the snippet for performing the block assignment below:
+```Python
+blockCnt = 1
+phys=gmsh.model.addPhysicalGroup(3, [cav_vol], blockCnt) # Block for the cavity volume
+gmsh.model.setPhysicalName(3, phys, "mpr1epr1") # 3 is the dimension (3D volume), mpr1epr1 is the name
+
+blockCnt += 1
+phys=gmsh.model.addPhysicalGroup(2, cav_surfs, tag=blockCnt) # Outer boundary block
+gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), Outer is the name
+```
+
+Here we have 2 blocks: block 1 containing all tetrahedrons forming the volume of the cavity (`cav_vol`), and block 2 with all triangles forming the outer surfaces of the cavity (`cav_surfs`). To assign properties to these blocks, we use a geometry configuration file, which in this case is [recCavity.json](./Meshes/Cavities/recCavity.json). This file is included below with comments to show how these assignments are formatted:
+
+```Python
+{
+  "scale": 1, # Scaling applied to the dimensions used in the mesh 
+              # If the mesh is defined in mm, this should be set to 1e-3
+  "volP": { # Parameters of volume blocks
+    "num": 1, # Number of volume blocks
+    "vol0": { # Properties of volume block 0
+      "epr": 1.0, # Relative permittivity
+      "mur": 1.0, # Relative permeability
+      "sigma": 0.0, # Conductivity
+      "tanD": 0.0 # Loss tangent
+    }
+  },
+  "surfP": { # Parameters of surface blocks
+    "num": 1, # Number of surface blocks
+    "surf0": {
+      "type": "Outer" # Type of boundary condition (outer = outer boundary, which is mapped to PEC)
+    }
+  }
+}
+```
+For the volume block, we specify material properties such as permittivity and permeability. For the surface, in this case we just mark this block as being the outer boundary. In this version of the package, the outer boundary is always treated as a perfect electric conductor (PEC), but later versions may add support for additional boundary conditions. Note that more detailed documentation on the types of blocks and their available settings can be found in the docstring of `writeGeometryJSON()` in [JSON_util.py](./JSON_util.py). Examples of more complicated block definitions such as ports and singular lines will also be included in later examples.
+
+FEM simulations are performed by running [main.py](./main.py) with the flag `-f` pointing to a simulation configuration file, which specifies settings of the simulation itself. The configuration file used for this example is [cavity_Eig.json](./Meshes/Cavities/cavity_Eig.json). The contents of the file are included below, with comments indicating what each setting does:
 
 ```Python
 {
@@ -66,34 +103,7 @@ In general, the simulation is configured by running main with the flag "-f" poin
 ```
 Note that a complete list of settings can be found in the docstring of `writeSimJSON()` in [JSON_util.py](./JSON_util.py). 
 
-In order to specify the properties of the volume of the cavity and its outer boundary, we include the "geomFile" above. The file [recCavity.json](./Meshes/Cavities/recCavity.json) is also included below to demonstrate how these files can be configured. The mesh file [recCavity.msh](./Meshes/Cavities/recCavity.msh) contains two "blocks": one containing all tetrahedrons in the volume of the cavity, and one containing all triangles on the outer boundary of the cavity. As shown below, the geometry configuration file gives the properties of each of these blocks. 
-
-```Python
-{
-  "scale": 1, # Scaling applied to the dimensions used in the mesh 
-              # If the mesh is defined in mm, this should be set to 1e-3
-  "volP": { # Parameters of volume blocks
-    "num": 1, # Number of volume blocks
-    "vol0": { # Properties of volume block 0
-      "epr": 1.0, # Relative permittivity
-      "mur": 1.0, # Relative permeability
-      "sigma": 0.0, # Conductivity
-      "tanD": 0.0 # Loss tangent
-    }
-  },
-  "surfP": { # Parameters of surface blocks
-    "num": 1, # Number of surface blocks
-    "surf0": {
-      "type": "Outer" # Type of boundary condition (outer = outer boundary, which is mapped to PEC)
-    }
-  }
-}
-```
-As for the simulation files, more detailed documentation on the types of blocks and their available settings can be found in the docstring of `writeGeometryJSON()` in [JSON_util.py](./JSON_util.py). 
-
-For the volume block, we specify material properties such as permittivity and permeability. For the surface, in this case we just mark this block as being the outer boundary. In this version of the package, the outer boundary is always treated as a perfect electric conductor (PEC), but later versions may add support for additional boundary conditions.
-
-Once the settings are configured, the simulation can be ran using the following command
+Once the settings are configured, the simulation can be ran using the following command:
 
 ```Bash
 python main.py -f "./Meshes/Cavities/cavity_Eig.json"
@@ -102,34 +112,34 @@ python main.py -f "./Meshes/Cavities/cavity_Eig.json"
 The results will print out in the terminal, and should look similar to the following:
 
 ```
-Time spent forming element lists: 1.004 s
-Number of tetrahdrons: 990
+Time spent forming element lists: 0.343 s
+Number of tetrahdrons: 3106
 Number of wedges: 0
-Number of nodes: 48
-Number of edges: 771
-Number of triangular faces: 1712
+Number of nodes: 308
+Number of edges: 2987
+Number of triangular faces: 5784
 Number of quadrilateral faces: 0
-Longest triangular edge: 2.592e+00 mm
-Shortest triangular edge: 1.124e+00 mm
-Average triangular edge length: 1.807e+00 mm
-Triangular edge length standard deviation: 2.979e-01 mm
-Time spent building basis maps: 0.005 s. Element order: 1. Singular element order: 1 Total number of unknowns: 771
+Longest triangular edge: 1.906e+00 mm
+Shortest triangular edge: 7.381e-01 mm
+Average triangular edge length: 1.176e+00 mm
+Triangular edge length standard deviation: 2.627e-01 mm
+Time spent building basis maps: 0.006 s. Element order: 1. Singular element order: 1 Total number of unknowns: 2987
 Beginning matrix assembly
-Matrix assembly done, time elapsed = 10.110 s
+Matrix assembly done, time elapsed = 9.196 s
 Finding eigenvalues
-5 eigenvalues found in 0.057 s.
-Eigenvalue 0: 24.50740+0.00000j GHz
-Eigenvalue 1: 32.81014+0.00000j GHz
-Eigenvalue 2: 35.03249+0.00000j GHz
-Eigenvalue 3: 35.13929+0.00000j GHz
-Eigenvalue 4: 37.82026+0.00000j GHz
-Total run time: 11.902 s
+5 eigenvalues found in 0.115 s.
+Eigenvalue 0: 24.55098+0.00000j GHz
+Eigenvalue 1: 32.42135+0.00000j GHz
+Eigenvalue 2: 35.28165+0.00000j GHz
+Eigenvalue 3: 35.36425+0.00000j GHz
+Eigenvalue 4: 37.98527+0.00000j GHz
+Total run time: 11.963 s
 ```
 
 After providing some diagnostic and timing information, the requested eigenvalues are printed. If the code is configured to connect to Paraview (see Windows Environment Setup above)
 and `"saveFields" == true` in [cavity_Eig.json](./Meshes/Cavities/cavity_Eig.json), Paraview will open and allow the user to visualize the fields throughout the cavity. Note that this plotting method only allows a single value to be provided for each mesh element, so the resolution will be relatively poor for coarse meshes like this one. More sophisticated plotting approaches will be discussed in later examples to overcome this issue.
 
-When Paraview initially opens, the center view may be blank. The geometry can be plotted by clicking the closed eye icon in the "Pipeline Browser" (which may need to be added via the View tab). To plot the field distribution throughout the geometry, the "coloring" drop-down in the "Properties" menu should be set to "E_" (which can be tuned to plot the magnitude or any vector component). If there are surface blocks, these need to be unchecked in the "Element Blocks" section of the "Properties" menu to ensure only data associated with the tetrahedrons is included. By changing the display representation in that menu to "Volume," we can generate images such as the one below:
+When Paraview initially opens, the center view may be blank. The geometry can be plotted by clicking the closed eye icon in the "Pipeline Browser" (which may need to be added via the View tab). To plot the field distribution throughout the geometry, the "coloring" drop-down in the "Properties" menu should be set to "E_" (which can be tuned to plot the magnitude or any vector component). If there are surface blocks, these need to be unchecked in the "Element Blocks" section of the "Properties" menu to ensure only data associated with the tetrahedrons is included. By changing the display representation in that menu to "Volume," we can generate images such as the one below. Note that we have also applied the `CellDatatoPointData` filter in Paraview to smooth out the plot.
 
 ![Plot of an eigenmode of the rectangular cavity](./Results/cavity_Eig.png)
 
@@ -141,35 +151,24 @@ Next, we consider another eigenmode problem in the form of a ridged waveguide ca
 
 ![Plot of an eigenmode of the rectangular cavity](./Results/ridgedCavity_Eig.png)
 
-In order to resolve this mode accurately with a coarse mesh, we include singular basis functions in the tetrahedrons contacting this metal edge. In the simulation file [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), we add another setting to specify the singular basis function order:
+In order to resolve this mode accurately with a coarse mesh, we include singular basis functions in the tetrahedrons contacting this metal edge. To accomodate these singular edges in the mesh, we add another block containing the set of mesh edges along the singular features in the mesh file [meshRidgedCavity_gmsh.py](./Meshes/Cavities/meshRidgedCavity_gmsh.py). The excerpt of this script creating the blocks is included below:
 
 ```Python
-{
-  "probP": {
-    "type": "Eig",
-    "numEig": 5,
-    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
-    "meshFile": "./Meshes/Cavities/ridgedCavity.e",
-    "bOrder": 1,
-    "sOrder": 1 # Order of singular basis functions
-  },
-  "solveP": {
-    "pkg": "SciPy",
-    "shift": 20e9,
-    "tol": 1e-06
-  },
-  "outP": {
-    "resFile": "./Results/ridgedCavity_p=1,s=1.npz",
-    "saveFields": true,
-    "fieldType": "E",
-    "fFile": "fields.npy"
-  },
-  "numProcs": 1
-}
+## Make Blocks
+blockCnt = 1
+phys=gmsh.model.addPhysicalGroup(3, [cav_vol], blockCnt) # Block for the cavity volume
+gmsh.model.setPhysicalName(3, phys, "mpr1epr1") # 3 is the dimension (3D volume), mpr1epr1 is the name
+
+blockCnt += 1
+phys=gmsh.model.addPhysicalGroup(2, cav_surfs, tag=blockCnt) # Outer boundary block
+gmsh.model.setPhysicalName(2, phys, "Outer") # 2 is the dimension (2D surfaces), Outer is the name
+
+blockCnt += 1
+phys=gmsh.model.addPhysicalGroup(1, singLines, tag=blockCnt) # Singular line block
+gmsh.model.setPhysicalName(1, phys, "singLines") # 1 is the dimension (1D edges), singLines is the name
 ```
 
-These functions are only included in tetrahedrons contacting singular edges in the geometry. These edges are marked by blocks in the geometry, as can be seen in the geometry file [ridgedCavity_sing.json](./Meshes/Cavities/ridgedCavity_sing.json):
-
+Then within the geometry file [ridgedCavity_sing.json](./Meshes/Cavities/ridgedCavity_sing.json), we mark this block as being a set of singular lines and assign the coefficient describing the singular behavior:
 ```Python
 {
   "scale": 1,
@@ -193,14 +192,40 @@ These functions are only included in tetrahedrons contacting singular edges in t
     "line0": {
       "type": "singLine", # Marks that singular basis functions should be added
                           # to tets touching nodes or edges along this line
-      "coeff": 0.667 # Coefficient of the singularity
+      "coeff": 0.667 # Coefficient of the singularity (2/3 for 90 degree metal wedges)
     }
   }
 }
 
 ```
-
 In the current version of the code, integrals of the singular basis functions are pre-calculated for a unit tetrahedron and rescaled to the dimensions of each tetrahedron in the mesh[^1]. This step has been performed in advance for coefficients of 1/2 and 2/3 to match the expected behavior near metal wedges at 0 and 90 degree angles respectively [^2], and the resulting integrals are stored in [BasisMats](./BasisMats/). If alternative coefficients are needed, additional files can be generated using [singBasisMats_tets_numeric.py](singBasisMats_tets_numeric.py).
+
+In the simulation file [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), we add another setting to specify the singular basis function order:
+
+```Python
+{
+  "probP": {
+    "type": "Eig",
+    "numEig": 5,
+    "geomFile": "./Meshes/Cavities/ridgedCavity_sing.json",
+    "meshFile": "./Meshes/Cavities/ridgedCavity.msh",
+    "bOrder": 1,
+    "sOrder": 1 # Order of singular basis functions
+  },
+  "solveP": {
+    "pkg": "SciPy",
+    "shift": 20e9,
+    "tol": 1e-06
+  },
+  "outP": {
+    "resFile": "./Results/ridgedCavity_p=1,s=1.npz",
+    "saveFields": true,
+    "fieldType": "E",
+    "fFile": "fields.npy"
+  },
+  "numProcs": 1
+}
+```
 
 Once again, we can run the simulation as configured above using
 
@@ -208,7 +233,7 @@ Once again, we can run the simulation as configured above using
 python main.py -f "./Meshes/Cavities/cavity_Eig.json"
 ```
 
-For eigenvalue 0, the singular basis functions give an eigenvalue of `31.44299 GHz`, giving a percent error of `1.09%` relative to the value of `31.76373 GHz` obtained using 2nd order functions on a dense mesh. If we remove the singular basis functions by changing "geomFile" in [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), the resulting eigenvalue is `30.76217 GHz`, meaning the percent error is increased to `3.15%`. A more detailed comparison of the performance can be found in our publication on the singular functions [^1].
+For eigenvalue 0, the singular basis functions give an eigenvalue of `31.02635 GHz`, giving a percent error of `2.32%` relative to the value of `31.76373 GHz` obtained using 2nd order functions on a dense mesh. If we remove the singular basis functions by changing "geomFile" in [ridgedCavity_Eig.json](./Meshes/Cavities/ridgedCavity_Eig.json), the resulting eigenvalue is `30.34435 GHz`, meaning the percent error is increased to `4.47%`. A more detailed comparison of the performance can be found in our publication on the singular functions [^1].
 
 ## Microstrip (Driven Simulation)
 
@@ -241,7 +266,7 @@ Here, we demonstrate how to perform a driven simulation using a microstrip trans
   "numProcs": 32 # Solve using 32 parallel processes (job must request 32 cores)
 }
 ```
-This configuration will cause perform simulations at 101 linearly-spaced frequency steps between 1 and 10 GHz. The code is set up to use solution-space projection to interpolate solutions at a smaller subset of frequencies to this full set, so using a large number of points will not require an excessively long simulation.
+This configuration will perform simulations at 101 linearly-spaced frequency steps between 1 and 10 GHz. The code is set up to use solution-space projection to interpolate solutions at a smaller subset of frequencies to this full set, so using a large number of points will not require an excessively long simulation.
 
 The mesh file [microstrip.msh]("./Meshes/Microstrips/microstrip.msh") contains several blocks, including two blocks for the volume, and five surface blocks. The surface blocks include one for the outer boundary, two PEC blocks for the signal trace and ground plane, and two blocks for the ports used to drive and terminate the geometry. The file is included with comments below to demonstrate how these blocks are specified:
 
