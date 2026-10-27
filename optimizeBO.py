@@ -63,10 +63,16 @@ def run_main(json_path):
 	##### Make and clear folders for placing Designs########
 	if os.path.exists(directory_O):
 		delete_folder(directory_O)
+	else:
+		os.makedirs(directory_O, exist_ok=True)
 	if os.path.exists(directory_R1):
 		delete_folder(directory_R1)
+	else:
+		os.makedirs(directory_R1, exist_ok=True)
 	if os.path.exists(directory_R2):
 		delete_folder(directory_R2)
+	else:
+		os.makedirs(directory_R2, exist_ok=True)
 	######### Design Variables ###########
 	dtype=torch.double
 	torch.set_default_dtype(dtype)
