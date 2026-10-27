@@ -1,0 +1,6 @@
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_117_PadY_307_Junclen_24_Pad2GndX_128_Pad2GndY_154_TaperW_11.5_TrenchZ_32.7_Kval_1.08_test_0_config.json
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_134_PadY_318_Junclen_42.6_Pad2GndX_102_Pad2GndY_61_TaperW_16.3_TrenchZ_83_Kval_7.06_test_5_config.json
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_139_PadY_275_Junclen_63.3_Pad2GndX_74.5_Pad2GndY_73.7_TaperW_18_TrenchZ_81.3_Kval_2.63_test_2_config.json
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_154_PadY_315_Junclen_72.8_Pad2GndX_66.7_Pad2GndY_84_TaperW_15.2_TrenchZ_50.6_Kval_7.98_test_4_config.json
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_69_PadY_351_Junclen_30.2_Pad2GndX_99.5_Pad2GndY_137_TaperW_16.1_TrenchZ_93.9_Kval_10.9_test_3_config.json
+python main.py -f ./Bayesian_Optimization/Mesh/Gmsh_PadX_81.4_PadY_258_Junclen_47.9_Pad2GndX_56_Pad2GndY_94.6_TaperW_12.3_TrenchZ_24.2_Kval_1.61_test_1_config.json

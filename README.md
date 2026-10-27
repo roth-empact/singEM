@@ -527,8 +527,64 @@ To visually demonstrate the effectiveness of the singular basis functions, we ca
 ![A region of the qubit mesh with the field distribution overlaid](./Results/qubitFields.png)
 
 
-[^1]: [Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries. arXiv preprint arXiv:2606.18140.](https://arxiv.org/abs/2606.18140)
 
-[^2]: Jackson, J. D. (1998). Classical Electrodynamics. John Wiley & Sons.
+
+## Geometry Optimization
+One remarkable benefit of using singular basis functions to evaluate the field singularities, lies in the reduced computational overhead associated with evaluating participation ratios. Simulations that take days with conventional EM softwares now take minutes[^1]. This means we can use these basis functions for optimizing geometries of interest.
+
+One approach towards optimization is to use Bayesian optimization[^3]. This is a standard technique that tackles the optimization of costly-to-evaluate black-box functions by training surrogate models. The training Gaussian process models are cheap to evaluate, allowing the optimizer to take a targetted approach towards choosing which geometries to build and solve for.
+
+The included example simulates a geometry similar to that covered in [^1], where our goal is to maximize the quality factor of our geometry while keeping the junction capacitance the same. The entire process is as follows:
+
+1. The user calls the Bayesian Optimization code [optimizeBO.py](./optimizeBO.py) with settings refered through a json file [BO_settings.json](./Bayesian_Optimization/Files/BO_settings.json) using the following command and json file structure
+```Bash
+python optimizeBO.py -f "./Bayesian_Optimization/Files/BO_settings.json"
+``` 
+
+```Python
+{
+    "simBounds":{
+        "numParam": 8, # Number of parameters
+        "paramNames": ["PadX","PadY","Junc_len","P2GndY","P2GndX","TrenchZ","TaperW","Kval"],
+        "paramLowerBound": [60, 250, 20, 50, 50, 2.923, 10, 0],
+        "paramUpperBound": [240, 600, 80, 200, 200, 100, 20, 20],
+        "tanD": [29.4e-3,29.4e-3,29.4e-3,3.3e-4,3.3e-4,3.3e-4,1.7e-3], # Loss tangent for each interface layer
+        "capTarget": 65, # Target capacitance
+        "capTol": 10, # Tolerance of capacitance
+        "limitX": 610, # Linear constraint of device in X dimension
+        "limitY": 640  # Linear constraint of device in Y dimension
+    },
+
+    "simSettings":{
+        "numIter": 10, # Number of iterations
+        "numInitial": 300, # Initial points to train GP 
+        "batchSize": 8, # Number of points for each subsequent iteration
+        "simType": "Serial", # Simulation type: "Serial" or "Parallel"
+        "detectMeshSpike": true, # Code to detect meshing spikes
+        "simGeoJson": "./Bayesian_Optimization/Files/singGeo.json", # path to Geometry Json for FEM simulation
+        "simConfigJson": "./Bayesian_Optimization/Files/singConfig.json", # path to Config Json for FEM simulation
+        "simMeshFile": "./Bayesian_Optimization/Files/optimizeMeshGenerate.py", # path to parameterized mesh generation code
+        "numProcsPerSim": 32, # Number of process used by one simulation
+        "totalProcsParallel": 256 # Total number of process to use (only useful for parallel simType)
+
+    },
+
+    "fileDirectory": {
+        "meshFolder": "./Bayesian_Optimization/Mesh/", # Path to folder where store mesh and config for every geometry
+        "resultFolder": "./Bayesian_Optimization/Results/",  # Path to folder where the results (S-param) are stored
+        "gpFolder": "./Bayesian_Optimization/GP/" # Path to folder where the trained GP is stored for each iteration to view later
+    }
+}
+```
+2. The code then samples the design space for intial points, these are then sent to the parameterized geometry and mesh generation file [optimizeMeshGenerate.py](./Bayesian_Optimization/Files/optimizeMeshGenerate.py).
+3. The results are used to train the GP, after which the acquisition function is searched for another set of points allowing the optimization to proceed in a loop
+4. After each iteration the acquisition function prints out how much improvement it expects in the current best quality factor
+5. Once the specified number of iterations is reached, depending if the ""detectMeshSpike"" variable is True, a final search of the GP is done to get the best predicted design
+
 
 #
+[^1]: [Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). _Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries_. arXiv preprint arXiv:2606.18140.](https://arxiv.org/abs/2606.18140)
+
+[^2]: Jackson, J. D. (1998). _Classical Electrodynamics_. John Wiley & Sons.
+
+[^3]: [Balandat, M., Karrer, B., Jiang, D., Daulton, S., Letham, B., Wilson, A. G., & Bakshy, E. (2020). BoTorch: A framework for efficient Monte-Carlo Bayesian optimization. _Advances in neural information processing systems_, 33, 21524-21538.](https://proceedings.neurips.cc/paper_files/paper/2020/file/f5b1b89d98b7286673128a5fb112cb9a-Paper.pdf)

@@ -1,0 +1,40 @@
+{
+  "simType": "E",
+  "probP": {
+    "type": "FD",
+    "maxAMR": 1,
+    "useDD": false,
+    "minFreq": 5e9,
+    "maxFreq": 5e9,
+    "numSteps": 1,
+    "stepType": "linear",
+    "geomFile": "./Bayesian_Optimization/Files/singGeo.json",
+    "meshFile": "./Bayesian_Optimization/Files/genericSing.msh",
+    "outBC": "PEC",
+    "bOrder": 2,
+    "sOrder": 3,
+    "singEdgeFlag": true,
+    "3DIntOrder": 4,
+    "2DIntOrder": 2,
+    "portMatrix": false
+  },
+  "solveP": {
+    "pkg": "PETSc",
+    "ksp": "LU",
+    "pc": "GASM",
+    "tol": 1e-06,
+    "maxit": 100,
+    "restart": 30,
+    "dropTol": 1e-09,
+    "rowFill": 300,
+    "preType": "Static",
+    "adaptSweep":false 
+  },
+  "outP": {
+    "saveV": true,
+    "saveS": false,
+    "resFile": "./Meshes/GK_surf/Mesh/Sym_noTrench_Test_5GHz.npz",
+    "saveFields": false
+  },
+  "numProcs": 32
+}

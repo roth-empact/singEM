@@ -1,0 +1,103 @@
+{
+  "scale": 1e-3,
+  "volP": {
+    "num": 2,
+    "vol0": {
+      "epr": 11.90,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    },
+    "vol1": {
+      "epr": 1.0,
+      "mur": 1.0,
+      "sigma": 0.0,
+      "tanD": 0.0
+    }
+  },
+  "surfP": {
+    "num": 11,
+    "surf0": {
+      "type": "Outer"
+    },
+    "surf1": {
+      "type": "PEC"
+    },
+    "surf2": {
+      "type": "PEC"
+    },
+    "surf3": {
+      "type": "Port",
+      "Z": 50,
+      "portType": "Open",
+      "width": 0.00292,
+      "direction": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "Vsmag": 1.0
+    },
+    "surf4": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 10.0
+    },
+    "surf5": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 10.0
+    },
+    "surf6": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 10.0
+    },
+    "surf7": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 11.9
+    },
+    "surf8": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 11.9
+    },
+    "surf9": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 11.9
+    },
+    "surf10": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 3.9
+    }
+  },
+  "lineP": {
+    "num": 1,
+    "line0": {
+      "type": "singLine",
+      "coeff": 0.667
+    }
+  }
+}
