@@ -7,7 +7,6 @@ import numpy as np
 import json
 from optimizeBO import delete_folder
 def generate_geometries(points,meshDir,runPara,simType,simGeo,simConfig,resultDir,numProcs,Code):
-	Json_Code="./Bayesian_Optimization/Files/fileParaOrganize.py"
 	if os.path.exists(meshDir):
 		delete_folder(meshDir)
 	with open("./Bayesian_Optimization/Files/meshGenerate.txt","w") as f:

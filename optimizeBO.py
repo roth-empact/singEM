@@ -20,24 +20,16 @@ from scipy.optimize import minimize
 from generateGeometry import *
 from evaluateQuantity import *
 
-
+torch.manual_seed(1234)
 ############### Helper Functions ##################
 def objective(x):
     return -predict_Q(x)
 
-def make_CC_L2(C_target,C_tol):
-	
-	def capacitance_constraint(x):
-		return predict_C(x)-(C_target-C_tol)
-	
-	return capacitance_constraint
+def make_CC_L2(predict_C, C_target, C_tol):
+    return lambda x: predict_C(x) - (C_target - C_tol)
 
-def make_CC_U2(C_target,C_tol):
-	
-	def capacitance_constraint(x):
-		return (C_target+C_tol)-predict_C(x)
-	
-	return capacitance_constraint
+def make_CC_U2(predict_C, C_target, C_tol):
+    return lambda x: (C_target + C_tol) - predict_C(x)
 
 def quality_constraint(Y,X=None):
 	return Y[...,0]
@@ -100,10 +92,10 @@ def run_main(json_path):
 		mesh_parallel = batch_size
 		parallel_cur = batch_size
 	else:
-		mesh_parallel = batch_size
+		mesh_parallel = data["simSettings"]["totalProcsParallel"] // 2
 		parallel_cur = data["simSettings"]["totalProcsParallel"] // data["simSettings"]["numProcsPerSim"]
 	iterations = data["simSettings"]["numIter"]
-	res_GK = 20 # Parameters for acquisition function optimization
+	res_GK = 10 # Parameters for acquisition function optimization
 	raw_GK = 2048 # Parameters for acquisition function optimization
 
 
@@ -149,13 +141,14 @@ def run_main(json_path):
 
 	print("Getting Initial Sample",flush=True)
 	print("Using Sobol Sequence",flush=True)
-	sobol=SobolEngine(dimension=dim,scramble=True)
+	sobol=SobolEngine(dimension=dim, scramble=True, seed=1234)
 	Ntrain_x=sobol.draw(n_initial)
 	mask=torch.ones(Ntrain_x.shape[0],dtype=torch.bool)
 	for indices,coefficients,rhs in inequality_constraints:
 		values = Ntrain_x[:,indices] @ coefficients
 		mask &= values >= rhs-1e-8
 	Ntrain_x = Ntrain_x[mask]
+	n_initial = Ntrain_x.shape[0]
 	print(f"Number of viable points from intial sample: {mask.sum().item()}")
 	train_x=unnormalize(Ntrain_x,bounds)
 
@@ -164,8 +157,8 @@ def run_main(json_path):
 	first_time = time.time()
 	generate_geometries(train_x,directory_O,mesh_parallel,simType,data["simSettings"]["simGeoJson"],data["simSettings"]["simConfigJson"],data["fileDirectory"]["resultFolder"],data["simSettings"]["numProcsPerSim"],data["simSettings"]["simMeshFile"])
 	Q_val,C_val,Ntrain_x,Participation_Data=run_simulations(parallel_cur,n_initial,Ntrain_x,simType,data["simBounds"]["tanD"],directory_O) 
-	print(f"Average Value of Capacitance of run designs {np.mean(C_val)}")
-	print(f"Average Value of Quality of run designs {np.mean(Q_val)}")
+	print(f"Average Value of Capacitance of run designs {np.mean(C_val)}",flush=True)
+	print(f"Average Value of Quality of run designs {np.mean(Q_val)}",flush=True)
 	N_Q=torch.tensor(Q_val,dtype=dtype).reshape(-1,1)
 	N_C=torch.tensor(C_val,dtype=dtype).reshape(-1,1)
 
@@ -179,7 +172,7 @@ def run_main(json_path):
 		if iteration != 0:
 			## Running the next set of sims
 			print(f"Performing iteration number {iteration}",flush=True)
-			generate_geometries(unnormalize(NcandidateX,bounds),directory_O,dim,batch_size,simType,data["simSettings"]["simGeoJson"],data["simSettings"]["simConfigJson"],data["fileDirectory"]["resultFolder"],data["simSettings"]["numProcsPerSim"],data["simSettings"]["simMeshFile"])
+			generate_geometries(unnormalize(NcandidateX,bounds),directory_O,batch_size,simType,data["simSettings"]["simGeoJson"],data["simSettings"]["simConfigJson"],data["fileDirectory"]["resultFolder"],data["simSettings"]["numProcsPerSim"],data["simSettings"]["simMeshFile"])
 			Q_val,C_val,NcandidateX,Participation_Data2=run_simulations(parallel_cur,batch_size,NcandidateX,simType,data["simBounds"]["tanD"],directory_O) 
 			NC_Q=torch.tensor(Q_val,dtype=dtype).reshape(-1,1)
 			NC_C=torch.tensor(C_val,dtype=dtype).reshape(-1,1)
@@ -247,10 +240,10 @@ def run_main(json_path):
 				print(f"Best Design from FEM Capacitance C= {C_Best.item()} ",flush=True)
 				print(f"Best Design parameters {X_Best}")
 				if iteration!=0 and detectMeshSpike:
-					print("Checking around maxima before training GP")
+					print("Performing Mesh Spike Check Around Maxima")
 					new_near=nearby_points(X_Best,percent=0.005,n_points=batch_size,lower=bounds[0,:],upper=bounds[1,:],param_range=bounds[1,:].numpy()-bounds[0,:].numpy())
 					Nnew_near=normalize(new_near,bounds)
-					generate_geometries(new_near,directory_O,dim,batch_size,simType,data["simSettings"]["simGeoJson"],data["simSettings"]["simConfigJson"],data["fileDirectory"]["resultFolder"],data["simSettings"]["numProcsPerSim"],data["simSettings"]["simMeshFile"])
+					generate_geometries(new_near,directory_O,batch_size,simType,data["simSettings"]["simGeoJson"],data["simSettings"]["simConfigJson"],data["fileDirectory"]["resultFolder"],data["simSettings"]["numProcsPerSim"],data["simSettings"]["simMeshFile"])
 					Q_val,C_val,_,_=run_simulations(parallel_cur,batch_size,Nnew_near,simType,data["simBounds"]["tanD"],directory_O) 
 					check_NC_Q=torch.tensor(Q_val,dtype=dtype).reshape(-1,1)
 					if np.abs(Q_Best.item()-check_NC_Q.mean().item())<=0.2*np.abs(Q_Best.item()):
@@ -329,7 +322,7 @@ def run_main(json_path):
 			inequality_constraints=inequality_constraints,
 		)
 
-		print(f"Belief for next iteration improvement: {np.exp(acq_value.item())}")
+		print(f"Belief for possible improvement: {np.exp(acq_value.item())}")
 		if iteration == 0:
 			print(f"Iteration {iteration} took {time.time()-first_time:.3f} s")
 		else:
@@ -337,15 +330,14 @@ def run_main(json_path):
 		
 		iteration+=1
 
-	if data["simSettings"]["meshSpikeCheck"]:
+	if data["simSettings"]["meshSpikeCheck"] and iterations>0:
 		print("Performing meshSpikeCheck by sweeping GP")
-		predict_Q=make_predict_Q(model.models[0])
-		predict_Qstd=make_predict_Qstd(model.models[0])	
-		predict_C=make_predict_C(model.models[1])
-		predict_Cstd=make_predict_Cstd(model.models[1])
-
-		CC_U=make_CC_U2(C_target,C_tol)
-		CC_L=make_CC_L2(C_target,C_tol)
+		predict_Q = make_predict_Q(model.models[0])
+		predict_Qstd = make_predict_Qstd(model.models[0])
+		predict_C = make_predict_C(model.models[1])
+		predict_Cstd = make_predict_Cstd(model.models[1])
+		CC_L = make_CC_L2(predict_C, C_target, C_tol)
+		CC_U = make_CC_U2(predict_C, C_target, C_tol)
 		CC_arr=[
 			{"type":"ineq","fun":CC_L},
 			{"type":"ineq","fun":CC_U}
@@ -361,12 +353,12 @@ def run_main(json_path):
 				"fun" : lambda x, indices=indices,coeff=coeff,rhs=rhs: x[indices]@ coeff - rhs
 			
 			})
-		sampler = qmc.Sobol(d=dim, scramble=True)
+		sampler = qmc.Sobol(d=dim, scramble=True, seed=1234)
 		starts = sampler.random_base2(m=15)
 		GP_search_val=None
 		for x0 in starts:
 			res = minimize(
-				objective,
+				lambda x: -predict_Q(x),
 				x0,
 				method="SLSQP",
 				bounds=[(0,1)]*dim,

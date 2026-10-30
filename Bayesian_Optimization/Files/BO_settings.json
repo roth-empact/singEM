@@ -2,8 +2,8 @@
     "simBounds":{
         "numParam": 8,
         "paramNames": ["PadX","PadY","Junc_len","P2GndY","P2GndX","TrenchZ","TaperW","Kval"],
-        "paramLowerBound": [60, 250, 20, 50, 50, 2.923, 10, 0],
-        "paramUpperBound": [240, 600, 80, 200, 200, 100, 20, 20],
+        "paramLowerBound": [60, 250, 20, 50, 50, 10, 2.923, 0],
+        "paramUpperBound": [240, 600, 80, 200, 200, 20, 100, 20],
         "tanD": [29.4e-3,29.4e-3,29.4e-3,3.3e-4,3.3e-4,3.3e-4,1.7e-3],
         "capTarget": 65,
         "capTol": 10,
@@ -12,10 +12,10 @@
     },
 
     "simSettings":{
-        "numIter": 10,
-        "numInitial": 50,
+        "numIter": 12,
+        "numInitial": 1000,
         "batchSize": 8,
-        "simType": "Serial",
+        "simType": "Parallel",
         "meshSpikeCheck": true,
         "simGeoJson": "./Bayesian_Optimization/Files/singGeo.json",
         "simConfigJson": "./Bayesian_Optimization/Files/singConfig.json",

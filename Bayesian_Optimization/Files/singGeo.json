@@ -16,7 +16,7 @@
     }
   },
   "surfP": {
-    "num": 11,
+    "num": 14,
     "surf0": {
       "type": "Outer"
     },
@@ -68,24 +68,45 @@
       "type": "Output",
       "fieldType": "surfPart",
       "thickness": 3e-6,
-      "vol": 0,
-      "epr": 11.9
+      "vol": 1,
+      "epr": 10.0
     },
     "surf8": {
       "type": "Output",
       "fieldType": "surfPart",
       "thickness": 3e-6,
-      "vol": 0,
-      "epr": 11.9
+      "vol": 1,
+      "epr": 10.0
     },
     "surf9": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 1,
+      "epr": 10.0
+    },
+    "surf10": {
       "type": "Output",
       "fieldType": "surfPart",
       "thickness": 3e-6,
       "vol": 0,
       "epr": 11.9
     },
-    "surf10": {
+    "surf11": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 11.9
+    },
+    "surf12": {
+      "type": "Output",
+      "fieldType": "surfPart",
+      "thickness": 3e-6,
+      "vol": 0,
+      "epr": 11.9
+    },
+    "surf13": {
       "type": "Output",
       "fieldType": "surfPart",
       "thickness": 3e-6,

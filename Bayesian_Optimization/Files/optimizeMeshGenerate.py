@@ -414,8 +414,8 @@ gmsh.model.mesh.field.setAsBackgroundMesh(threshold)
 
 gmsh.option.setNumber("Mesh.Algorithm", 6)
 gmsh.option.setNumber("Mesh.Algorithm3D", 10)
-# gmsh.model.mesh.generate(2)
-# gmsh.model.mesh.generate(3)
+gmsh.model.mesh.generate(2)
+gmsh.model.mesh.generate(3)
 
 ## Print number of Tets
 types, elemTags, nodeTags = gmsh.model.mesh.getElements(3)

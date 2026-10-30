@@ -80,6 +80,8 @@ def make_capacitance_constraintL(C_target,C_tol):
 
 def cost_eval(batch_size,Ntrain_x,tanD,directory_O):
 	dir_Failed = "./Bayesian_Optimization/Failed"
+	if not os.path.exists(dir_Failed):
+		os.makedirs(dir_Failed)
 	dir_Optim = directory_O
 	with open("./Bayesian_Optimization/Files/runResults.txt","r") as f:
 		Res=f.read().splitlines()
@@ -140,8 +142,8 @@ def run_simulations(parallel_cur,batch_size,Ntrain_x,simType,tanD,directory_O):
 			for line in f:
 				command = line.strip()
 				if command:
-					subprocess.run(command.split(), check=True)
-		print(f"Serial mesh generation took {time.time()-start:.4f} seconds",flush=True)
+					subprocess.run(command.split(), check=True,stdout=subprocess.DEVNULL)
+		print(f"Serial simulation took {time.time()-start:.4f} seconds",flush=True)
 		return cost_eval(batch_size,Ntrain_x,tanD,directory_O)
 
 	else:
