@@ -555,11 +555,11 @@ To visually demonstrate the effectiveness of the singular basis functions, we ca
 
 
 ## Geometry Optimization
-One remarkable benefit of using singular basis functions to evaluate the field singularities, lies in the reduced computational overhead associated with evaluating participation ratios. Simulations that take days with conventional EM softwares now take minutes[^1]. This means we can use these basis functions for optimizing geometries of interest.
+A key application of using singular basis functions to evaluate the field singularities lies in the reduced computational overhead associated with evaluating surface participation ratios. Simulations that take days with conventional EM software now take minutes[^1]. This means we can use these basis functions for optimizing geometries of interest.
 
-One approach towards optimization is to use Bayesian optimization[^3]. This is a standard technique that tackles the optimization of costly-to-evaluate black-box functions by training surrogate models. The training Gaussian process models are cheap to evaluate, allowing the optimizer to take a targetted approach towards choosing which geometries to build and solve for.
+One approach for this is to use Bayesian optimization[^3]. This is a standard technique that tackles the optimization of costly-to-evaluate black-box functions by training surrogate models, which in this case are Gaussian process models. The trained Gaussian process models are cheap to evaluate, allowing the optimization to then be quickly performed on the surrogate itself rather than using the costly-to-evaluate black-box function, which in this case requires an FEM simulation every time it is queried. Here, we use the BoTorch software package to perform the Bayesian optimization. 
 
-The included example simulates a geometry similar to that covered in [^1], where our goal is to maximize the quality factor of our geometry while keeping the junction capacitance the same. The entire process is as follows:
+The example included here simulates a qubit geometry similar to that covered in [^1], where our goal is to maximize the quality factor of our geometry while keeping the device capacitance within a targeted range. For this kind of optimization, two Gaussian processes are actually used. One models the quality factor and the other models the device capacitance. The entire process is as follows:
 
 1. The user calls the Bayesian Optimization code [optimizeBO.py](./optimizeBO.py) with settings refered through a json file [BO_settings.json](./Bayesian_Optimization/Files/BO_settings.json) using the following command and json file structure
 ```Bash
@@ -601,10 +601,12 @@ python optimizeBO.py -f "./Bayesian_Optimization/Files/BO_settings.json"
     }
 }
 ```
-2. The code then samples the design space for intial points, these are then sent to the parameterized geometry and mesh generation file [optimizeMeshGenerate.py](./Bayesian_Optimization/Files/optimizeMeshGenerate.py).
-3. The results are used to train the GP, after which the acquisition function is searched for another set of points allowing the optimization to proceed in a loop
-4. After each iteration the acquisition function prints out how much improvement it expects in the current best quality factor
-5. Once the specified number of iterations is reached, depending if the ""detectMeshSpike"" variable is True, a final search of the GP is done to get the best predicted design
+2. The code then samples the design space for intial points, these are then sent to the parameterized geometry and mesh generation file [optimizeMeshGenerate.py](./Bayesian_Optimization/Files/optimizeMeshGenerate.py)
+3. The results are used to train the Gaussian process model, after which an "acquisition function" that helps guide the surrogate training and optimization process is searched for another set of points to test so that the optimization may proceed in a loop
+4. After each iteration, the acquisition function prints out how much improvement it expects in the current best quality factor
+5. Once the specified number of iterations is reached, depending on if the "detectMeshSpike" variable is True, a final search of the GP is done to get the best predicted design
+
+Note: The "detectMeshSpike" feature is recommended to be left on "true" if the simulations being performed include very thin layers that will lead to extremely low-quality tetrahedral mesh elements. In this situation, the singular basis functions can sometimes break down and provide an erroneously large result for the qubit quality factor that will then cause the rest of the optmization process to effectively stagnate. The "detectMeshSpike" feature attempts to rule out these erroneously large quality factor results so that the optimization process can continue. We are working on new sets of singular basis functions especially designed for extremely thin layers and intend to update singEM with them once their development has finished.
 
 
 #
