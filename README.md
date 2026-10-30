@@ -609,6 +609,20 @@ python optimizeBO.py -f "./Bayesian_Optimization/Files/BO_settings.json"
 Note: The "detectMeshSpike" feature is recommended to be left on "true" if the simulations being performed include very thin layers that will lead to extremely low-quality tetrahedral mesh elements. In this situation, the singular basis functions can sometimes break down and provide an erroneously large result for the qubit quality factor that will then cause the rest of the optmization process to effectively stagnate. The "detectMeshSpike" feature attempts to rule out these erroneously large quality factor results so that the optimization process can continue. We are working on new sets of singular basis functions especially designed for extremely thin layers and intend to update singEM with them once their development has finished.
 
 
+# Citing singEM
+If you use this package in the development of a published work, we would appreciate if you cited our singular basis function publication[^1]. BibTeX information is included below:
+```Text
+@misc{elkin2026singular,
+      title={Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries}, 
+      author={Samuel T. Elkin and Ghazi Khan and Ebrahim Forati and Brandon W. Langley and Dogan Timucin and Reza Molavi and Thomas E. Roth},
+      year={2026},
+      eprint={2606.18140},
+      archivePrefix={arXiv},
+      primaryClass={physics.comp-ph},
+      url={https://arxiv.org/abs/2606.18140}
+}
+```
+
 #
 [^1]: [Elkin, S. T., Khan, G., Forati, E., Langley, B. W., Timucin, D., Molavi, R., & Roth, T. E. (2026). _Singular Vector Finite Element Basis Functions for Tetrahedra in Complex Electromagnetic Geometries_. arXiv preprint arXiv:2606.18140.](https://arxiv.org/abs/2606.18140)
 
